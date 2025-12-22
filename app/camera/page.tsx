@@ -9,20 +9,6 @@ interface OwnerInfo {
   phone?: string
 }
 
-// Convert base64 VAPID key to Uint8Array
-function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4)
-  const base64 = (base64String + padding)
-    .replace(/-/g, '+')
-    .replace(/_/g, '/')
-  const rawData = window.atob(base64)
-  const outputArray = new Uint8Array(rawData.length)
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i)
-  }
-  return outputArray.buffer as ArrayBuffer
-}
-
 export default function CameraPage() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -69,90 +55,8 @@ export default function CameraPage() {
       console.error('Error checking registration:', err)
     }
 
-    // Request push notifications on first load
-    requestPushPermission()
-
     return () => stopCamera()
   }, [])
-
-  async function requestPushPermission() {
-    // Check if already asked or not supported
-    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-      return
-    }
-
-    // Don't ask again if already granted or denied
-    if (Notification.permission !== 'default') {
-      return
-    }
-
-    // Check if already asked before (stored in localStorage)
-    try {
-      if (localStorage.getItem('pushAsked') === 'true') {
-        return
-      }
-    } catch {
-      // Ignore localStorage errors
-    }
-
-    try {
-      // Mark as asked
-      localStorage.setItem('pushAsked', 'true')
-
-      // Get VAPID key
-      const vapidResponse = await fetch('/api/vapid-key', {
-        cache: 'no-store'
-      })
-      if (!vapidResponse.ok) return
-
-      const vapidData = await vapidResponse.json()
-      const vapidPublicKey = vapidData.vapidPublicKey?.trim()
-      if (!vapidPublicKey) return
-
-      // Request permission
-      const permission = await Notification.requestPermission()
-      if (permission !== 'granted') return
-
-      // Register service worker and subscribe
-      const registration = await navigator.serviceWorker.register('/sw.js')
-      await navigator.serviceWorker.ready
-
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
-      })
-
-      // Save subscription to localStorage
-      const subscriptionJson = subscription.toJSON()
-      localStorage.setItem('pushSubscription', JSON.stringify(subscriptionJson))
-      console.log('Push subscription created on first load')
-
-      // Also save to Supabase if user has email
-      const userEmail = localStorage.getItem('userEmail')
-      const existingUserId = localStorage.getItem('userId')
-      if (userEmail && existingUserId) {
-        try {
-          await fetch('/api/profile', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: userEmail,
-              name: localStorage.getItem('userName') || '',
-              phone: localStorage.getItem('userPhone') || '',
-              carPlate: localStorage.getItem('userPlate') || '',
-              pushSubscription: subscriptionJson,
-              existingUserId
-            })
-          })
-          console.log('Push subscription saved to Supabase')
-        } catch (saveErr) {
-          console.error('Failed to save push subscription to DB:', saveErr)
-        }
-      }
-    } catch (err) {
-      console.error('Error setting up push notifications:', err)
-    }
-  }
 
   async function startCamera() {
     try {
