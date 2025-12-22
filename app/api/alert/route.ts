@@ -85,24 +85,24 @@ export async function POST(request: Request) {
         await resend.emails.send({
           from: 'CarBlock Alert <onboarding@resend.dev>',
           to: owner.email,
-          subject: 'URGENT: Your car is blocking someone!',
+          subject: 'URGENT: You are blocking someone! Please move your car',
           html: `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #581c87, #86198f); padding: 30px; border-radius: 16px;">
-              <h1 style="color: white; margin: 0 0 20px 0; font-size: 24px;">Your Car is Blocking!</h1>
+              <h1 style="color: white; margin: 0 0 20px 0; font-size: 24px;">You Are Blocking Someone!</h1>
 
               <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 12px; margin-bottom: 20px;">
-                <p style="color: #e9d5ff; margin: 0 0 10px 0; font-size: 14px;">License Plate</p>
+                <p style="color: #e9d5ff; margin: 0 0 10px 0; font-size: 14px;">Your Car</p>
                 <p style="color: white; margin: 0; font-size: 28px; font-family: monospace; font-weight: bold;">${plate}</p>
               </div>
 
               <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 12px; margin-bottom: 20px;">
-                <p style="color: #e9d5ff; margin: 0 0 10px 0; font-size: 14px;">Reported by</p>
+                <p style="color: #e9d5ff; margin: 0 0 10px 0; font-size: 14px;">Blocked Person</p>
                 <p style="color: white; margin: 0; font-size: 18px; font-weight: bold;">${senderName}</p>
-                ${senderPhone ? `<a href="tel:${senderPhone}" style="color: #a855f7; text-decoration: none; font-size: 16px;">${senderPhone}</a>` : ''}
+                ${senderPhone ? `<a href="tel:${senderPhone}" style="color: #a855f7; text-decoration: none; font-size: 16px;">Call: ${senderPhone}</a>` : ''}
               </div>
 
-              <p style="color: #e9d5ff; font-size: 14px; margin-top: 20px;">
-                Please move your car as soon as possible.
+              <p style="color: #fbbf24; font-size: 16px; margin-top: 20px; font-weight: bold;">
+                Please move your car as soon as possible so they can leave!
               </p>
 
               <p style="color: #9333ea; font-size: 12px; margin-top: 30px;">
@@ -127,8 +127,8 @@ export async function POST(request: Request) {
         await webpush.sendNotification(
           owner.push_subscription,
           JSON.stringify({
-            title: 'Move Your Car!',
-            body: `${senderName} says your car (${plate}) is blocking them`,
+            title: 'You are blocking someone!',
+            body: `${senderName} needs you to move your car (${plate}). Please move it ASAP!`,
             icon: '/icon-192.png',
             badge: '/icon-192.png',
             data: { url: '/camera' }
