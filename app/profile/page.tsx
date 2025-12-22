@@ -12,6 +12,9 @@ export default function ProfilePage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
+  const [isIOS, setIsIOS] = useState(false)
+  const [isStandalone, setIsStandalone] = useState(false)
+  const [showIOSInstall, setShowIOSInstall] = useState(false)
 
   useEffect(() => {
     // Load from localStorage
@@ -23,6 +26,18 @@ export default function ProfilePage() {
     // Check notification permission
     if ('Notification' in window) {
       setNotificationsEnabled(Notification.permission === 'granted')
+    }
+
+    // Detect iOS and standalone mode
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    const standalone = window.matchMedia('(display-mode: standalone)').matches ||
+                       (navigator as Navigator & { standalone?: boolean }).standalone === true
+    setIsIOS(ios)
+    setIsStandalone(standalone)
+
+    // Show iOS install prompt if iOS + not standalone + notifications not enabled
+    if (ios && !standalone && Notification.permission !== 'granted') {
+      setShowIOSInstall(true)
     }
   }, [])
 
@@ -225,24 +240,64 @@ export default function ProfilePage() {
               <p className="text-white font-medium">Push Notifications</p>
               <p className="text-sm text-purple-300">Get instant alerts on your phone</p>
             </div>
-            <button
-              onClick={async () => {
-                const subscription = await enableNotifications()
-                if (subscription) {
-                  setSuccess('Notifications enabled! Save your profile to activate.')
-                }
-              }}
-              disabled={notificationsEnabled}
-              className={`px-4 py-2 rounded-xl font-medium ${
-                notificationsEnabled
-                  ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                  : 'bg-purple-500 text-white hover:bg-purple-400'
-              }`}
-            >
-              {notificationsEnabled ? 'Enabled' : 'Enable'}
-            </button>
+            {isIOS && !isStandalone ? (
+              <span className="px-3 py-1 bg-yellow-500/20 text-yellow-300 text-sm rounded-lg">
+                Install app first
+              </span>
+            ) : (
+              <button
+                onClick={async () => {
+                  const subscription = await enableNotifications()
+                  if (subscription) {
+                    setSuccess('Notifications enabled! Save your profile to activate.')
+                  }
+                }}
+                disabled={notificationsEnabled}
+                className={`px-4 py-2 rounded-xl font-medium ${
+                  notificationsEnabled
+                    ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                    : 'bg-purple-500 text-white hover:bg-purple-400'
+                }`}
+              >
+                {notificationsEnabled ? 'Enabled' : 'Enable'}
+              </button>
+            )}
           </div>
         </div>
+
+        {/* iOS Install Instructions */}
+        {showIOSInstall && (
+          <div className="bg-blue-500/20 border border-blue-500/30 rounded-2xl p-4">
+            <div className="flex justify-between items-start mb-3">
+              <p className="text-white font-medium">Install CarBlock App</p>
+              <button
+                onClick={() => setShowIOSInstall(false)}
+                className="text-blue-300 hover:text-white"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-blue-200 text-sm mb-3">
+              To receive push notifications on iPhone, install this app to your home screen:
+            </p>
+            <ol className="text-blue-200 text-sm space-y-2">
+              <li className="flex items-start gap-2">
+                <span className="bg-blue-500/30 rounded-full w-5 h-5 flex items-center justify-center text-xs shrink-0">1</span>
+                <span>Tap the <strong>Share</strong> button <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg> at the bottom of Safari</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="bg-blue-500/30 rounded-full w-5 h-5 flex items-center justify-center text-xs shrink-0">2</span>
+                <span>Scroll down and tap <strong>&quot;Add to Home Screen&quot;</strong></span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="bg-blue-500/30 rounded-full w-5 h-5 flex items-center justify-center text-xs shrink-0">3</span>
+                <span>Open the app from your home screen, then enable notifications</span>
+              </li>
+            </ol>
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-500/20 border border-red-500/30 text-red-300 p-4 rounded-xl text-center">
