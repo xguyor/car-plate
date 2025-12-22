@@ -182,6 +182,9 @@ export default function ProfilePage() {
       const parsedSubscription = pushSubscription ? JSON.parse(pushSubscription) : null
       console.log('Sending to API - pushSubscription:', parsedSubscription ? 'yes' : 'no')
 
+      // Get existing userId from localStorage to verify ownership
+      const existingUserId = localStorage.getItem('userId')
+
       const response = await fetch('/api/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -190,14 +193,17 @@ export default function ProfilePage() {
           email,
           phone,
           carPlate,
-          pushSubscription: parsedSubscription
+          pushSubscription: parsedSubscription,
+          existingUserId
         })
       })
 
       const data = await response.json()
 
-      if (data.error) {
-        throw new Error(data.error)
+      if (!response.ok || data.error) {
+        setError(data.error || 'Failed to save profile')
+        setSaving(false)
+        return
       }
 
       // Save to localStorage
@@ -212,7 +218,7 @@ export default function ProfilePage() {
       setSuccess('Profile saved!')
     } catch (err) {
       console.error('Save error:', err)
-      setError('Failed to save. Please try again.')
+      setError(err instanceof Error ? err.message : 'Failed to save. Please try again.')
     } finally {
       setSaving(false)
     }

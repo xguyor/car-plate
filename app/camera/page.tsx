@@ -126,7 +126,8 @@ export default function CameraPage() {
 
       // Also save to Supabase if user has email
       const userEmail = localStorage.getItem('userEmail')
-      if (userEmail) {
+      const existingUserId = localStorage.getItem('userId')
+      if (userEmail && existingUserId) {
         try {
           await fetch('/api/profile', {
             method: 'POST',
@@ -136,7 +137,8 @@ export default function CameraPage() {
               name: localStorage.getItem('userName') || '',
               phone: localStorage.getItem('userPhone') || '',
               carPlate: localStorage.getItem('userPlate') || '',
-              pushSubscription: subscriptionJson
+              pushSubscription: subscriptionJson,
+              existingUserId
             })
           })
           console.log('Push subscription saved to Supabase')

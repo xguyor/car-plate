@@ -3,13 +3,11 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 
 export async function POST(request: Request) {
   try {
-    const { name, email, phone, carPlate, pushSubscription } = await request.json()
+    const { name, email, phone, carPlate, pushSubscription, existingUserId } = await request.json()
 
     console.log('Profile save - email:', email)
+    console.log('Profile save - existingUserId:', existingUserId)
     console.log('Profile save - pushSubscription received:', !!pushSubscription)
-    if (pushSubscription) {
-      console.log('Profile save - subscription endpoint:', pushSubscription.endpoint?.substring(0, 50))
-    }
 
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
@@ -18,15 +16,53 @@ export async function POST(request: Request) {
     const supabase = await createServerSupabaseClient()
 
     // Check if user exists by email
-    const { data: existingUser } = await supabase
+    const { data: existingUserByEmail } = await supabase
       .from('users')
       .select('id')
       .eq('email', email)
       .single()
 
-    let userId = existingUser?.id
+    // Check if car plate is already registered to someone else
+    if (carPlate) {
+      const { data: existingPlateUser } = await supabase
+        .from('users')
+        .select('id, email')
+        .eq('car_plate', carPlate)
+        .single()
 
-    if (existingUser) {
+      if (existingPlateUser && existingPlateUser.email !== email) {
+        return NextResponse.json({
+          error: 'This car plate is already registered to another user'
+        }, { status: 409 })
+      }
+    }
+
+    // Check if phone is already registered to someone else
+    if (phone) {
+      const { data: existingPhoneUser } = await supabase
+        .from('users')
+        .select('id, email')
+        .eq('phone', phone)
+        .single()
+
+      if (existingPhoneUser && existingPhoneUser.email !== email) {
+        return NextResponse.json({
+          error: 'This phone number is already registered to another user'
+        }, { status: 409 })
+      }
+    }
+
+    let userId = existingUserByEmail?.id
+
+    if (existingUserByEmail) {
+      // User exists - check if this is the same user updating their profile
+      // Allow update only if they have the userId in localStorage (they own this account)
+      if (existingUserId && existingUserId !== existingUserByEmail.id) {
+        return NextResponse.json({
+          error: 'This email is already registered to another account'
+        }, { status: 409 })
+      }
+
       // Update existing user
       const { error: updateError } = await supabase
         .from('users')
@@ -41,7 +77,7 @@ export async function POST(request: Request) {
 
       if (updateError) throw updateError
     } else {
-      // Insert new user
+      // New user - create account
       userId = crypto.randomUUID()
       const { error: insertError } = await supabase
         .from('users')
