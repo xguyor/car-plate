@@ -62,11 +62,15 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
       }
     } else if (status === 'resolved') {
-      // Only the blocker (sender) can mark as "resolved"
-      if (sender?.id !== userId) {
+      // Both the blocker (sender) and the blocked person (receiver) can mark as "resolved"
+      if (sender?.id !== userId && receiver?.id !== userId) {
         return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
       }
     }
+
+    // Track who resolved it for notification logic
+    const resolvedBySender = sender?.id === userId
+    const resolvedByReceiver = receiver?.id === userId
 
     // Update the alert status
     const { error: updateError } = await supabase
@@ -139,8 +143,8 @@ export async function POST(request: Request) {
           console.error('Email failed:', emailError)
         }
       }
-    } else if (status === 'resolved' && receiver) {
-      // Notify the blocked person that the blocker has left
+    } else if (status === 'resolved' && resolvedBySender && receiver) {
+      // Notify the blocked person that the blocker has left (only if resolved by sender)
       const blockerName = sender?.name || 'The person blocking you'
 
       // Send push notification
