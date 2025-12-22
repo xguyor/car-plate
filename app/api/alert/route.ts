@@ -3,7 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { Resend } from 'resend'
 import webpush from 'web-push'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
 // Configure VAPID for Web Push (only if valid keys are provided)
 let webPushConfigured = false
@@ -85,25 +85,27 @@ export async function POST(request: Request) {
     if (insertError) throw insertError
 
     // Send email notification
-    try {
-      await resend.emails.send({
-        from: 'CarBlock Alert <onboarding@resend.dev>',
-        to: owner.email,
-        subject: 'URGENT: Your car is blocking someone',
-        html: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #2563eb;">Your Car is Blocking</h2>
-            <p>Hi,</p>
-            <p>Your car with plate number <strong>${plate}</strong> is blocking someone at the parking lot.</p>
-            <p>Please move it as soon as possible.</p>
-            <p style="color: #666; font-size: 12px; margin-top: 20px;">
-              Sent via CarBlock Alert System
-            </p>
-          </div>
-        `
-      })
-    } catch (emailError) {
-      console.error('Email failed:', emailError)
+    if (resend) {
+      try {
+        await resend.emails.send({
+          from: 'CarBlock Alert <onboarding@resend.dev>',
+          to: owner.email,
+          subject: 'URGENT: Your car is blocking someone',
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #2563eb;">Your Car is Blocking</h2>
+              <p>Hi,</p>
+              <p>Your car with plate number <strong>${plate}</strong> is blocking someone at the parking lot.</p>
+              <p>Please move it as soon as possible.</p>
+              <p style="color: #666; font-size: 12px; margin-top: 20px;">
+                Sent via CarBlock Alert System
+              </p>
+            </div>
+          `
+        })
+      } catch (emailError) {
+        console.error('Email failed:', emailError)
+      }
     }
 
     // Send push notification
