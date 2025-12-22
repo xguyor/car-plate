@@ -1,12 +1,24 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 
 interface OwnerInfo {
   name?: string
   email: string
   phone?: string
+}
+
+interface ActiveAlert {
+  id: string
+  detected_plate: string
+  status: 'active' | 'leaving_soon' | 'resolved'
+  type: 'sent' | 'received'
+  sender_name?: string
+  sender_phone?: string
+  receiver_name?: string
+  receiver_phone?: string
+  created_at: string
 }
 
 export default function CameraPage() {
@@ -26,6 +38,11 @@ export default function CameraPage() {
   const [showRegisterPrompt, setShowRegisterPrompt] = useState(false)
   const [userName, setUserName] = useState('')
 
+  // Active alerts state
+  const [activeAlerts, setActiveAlerts] = useState<ActiveAlert[]>([])
+  const [alertsLoading, setAlertsLoading] = useState(false)
+  const [updatingAlertId, setUpdatingAlertId] = useState<string | null>(null)
+
   function formatPlate(value: string) {
     const digits = value.replace(/\D/g, '')
     if (digits.length <= 7) {
@@ -36,6 +53,55 @@ export default function CameraPage() {
       if (digits.length <= 3) return digits
       if (digits.length <= 5) return `${digits.slice(0, 3)}-${digits.slice(3)}`
       return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5, 8)}`
+    }
+  }
+
+  // Load active alerts
+  const loadActiveAlerts = useCallback(async () => {
+    try {
+      const userId = localStorage.getItem('userId')
+      const userEmail = localStorage.getItem('userEmail')
+      if (!userId || !userEmail) return
+
+      setAlertsLoading(true)
+      const response = await fetch(`/api/history?userId=${userId}&email=${userEmail}`)
+      const data = await response.json()
+
+      if (data.alerts) {
+        // Filter only active (non-resolved) alerts
+        const active = data.alerts.filter((a: ActiveAlert) => a.status !== 'resolved')
+        setActiveAlerts(active)
+      }
+    } catch (err) {
+      console.error('Error loading alerts:', err)
+    } finally {
+      setAlertsLoading(false)
+    }
+  }, [])
+
+  // Update alert status
+  async function updateAlertStatus(alertId: string, status: 'leaving_soon' | 'resolved') {
+    setUpdatingAlertId(alertId)
+    try {
+      const userId = localStorage.getItem('userId')
+      const response = await fetch('/api/alert-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alertId, status, userId })
+      })
+
+      const data = await response.json()
+      if (data.error) {
+        alert(data.error)
+      } else {
+        // Reload alerts
+        loadActiveAlerts()
+      }
+    } catch (err) {
+      console.error('Error updating alert:', err)
+      alert('Failed to update status')
+    } finally {
+      setUpdatingAlertId(null)
     }
   }
 
@@ -51,12 +117,17 @@ export default function CameraPage() {
       const storedName = localStorage.getItem('userName')
       setIsRegistered(!!(userEmail && userId))
       setUserName(storedName || '')
+
+      // Load active alerts if registered
+      if (userEmail && userId) {
+        loadActiveAlerts()
+      }
     } catch (err) {
       console.error('Error checking registration:', err)
     }
 
     return () => stopCamera()
-  }, [])
+  }, [loadActiveAlerts])
 
   async function startCamera() {
     try {
@@ -177,6 +248,8 @@ export default function CameraPage() {
       } else {
         setOwnerInfo(data.owner)
         setSuccess(`Alert sent!`)
+        // Reload active alerts to show the new blocking status
+        loadActiveAlerts()
       }
     } catch (err) {
       console.log('Alert error:', err)
@@ -230,6 +303,115 @@ export default function CameraPage() {
           </div>
         </div>
       </div>
+
+      {/* Active Alerts Panel */}
+      {activeAlerts.length > 0 && (
+        <div className="p-4 max-w-md mx-auto space-y-3">
+          {/* Being Blocked Alerts */}
+          {activeAlerts.filter(a => a.type === 'received').map(alert => (
+            <div key={alert.id} className="bg-gradient-to-r from-red-500/20 to-orange-500/20 border border-red-500/40 rounded-2xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-3 h-3 bg-red-400 rounded-full animate-pulse"></div>
+                <span className="text-red-300 font-medium">Someone is blocking you!</span>
+              </div>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-white text-sm">Blocker: <span className="font-medium">{alert.sender_name || 'Unknown'}</span></p>
+                  {alert.sender_phone && (
+                    <a href={`tel:${alert.sender_phone}`} className="text-purple-300 text-sm flex items-center gap-1 mt-1">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                      </svg>
+                      {alert.sender_phone}
+                    </a>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className="text-purple-300 text-xs">Your car</p>
+                  <p className="text-white font-mono font-bold">{alert.detected_plate}</p>
+                </div>
+              </div>
+
+              {alert.status === 'active' && (
+                <button
+                  onClick={() => updateAlertStatus(alert.id, 'leaving_soon')}
+                  disabled={updatingAlertId === alert.id}
+                  className="w-full bg-orange-500 hover:bg-orange-400 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {updatingAlertId === alert.id ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      I Need to Leave Soon
+                    </>
+                  )}
+                </button>
+              )}
+
+              {alert.status === 'leaving_soon' && (
+                <div className="bg-orange-500/20 text-orange-300 py-3 px-4 rounded-xl text-center font-medium">
+                  Waiting for blocker to move...
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Blocking Others Alerts */}
+          {activeAlerts.filter(a => a.type === 'sent').map(alert => (
+            <div key={alert.id} className="bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border border-yellow-500/40 rounded-2xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                <span className="text-yellow-300 font-medium">
+                  {alert.status === 'leaving_soon' ? 'Owner wants to leave!' : 'You are blocking a car'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-white text-sm">Owner: <span className="font-medium">{alert.receiver_name || 'Unknown'}</span></p>
+                  {alert.receiver_phone && (
+                    <a href={`tel:${alert.receiver_phone}`} className="text-purple-300 text-sm flex items-center gap-1 mt-1">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                      </svg>
+                      {alert.receiver_phone}
+                    </a>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className="text-purple-300 text-xs">Blocked car</p>
+                  <p className="text-white font-mono font-bold">{alert.detected_plate}</p>
+                </div>
+              </div>
+
+              {alert.status === 'leaving_soon' && (
+                <div className="bg-red-500/30 text-red-300 py-2 px-3 rounded-lg text-sm text-center mb-3 animate-pulse">
+                  The owner needs to leave! Please move your car.
+                </div>
+              )}
+
+              <button
+                onClick={() => updateAlertStatus(alert.id, 'resolved')}
+                disabled={updatingAlertId === alert.id}
+                className="w-full bg-green-500 hover:bg-green-400 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {updatingAlertId === alert.id ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    I Moved My Car
+                  </>
+                )}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="p-4 max-w-md mx-auto">
