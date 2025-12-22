@@ -69,11 +69,14 @@ export default function ProfilePage() {
     }
 
     try {
-      // Fetch VAPID key from API
+      // Fetch VAPID key from API with cache busting
       console.log('Fetching VAPID key from API...')
       let vapidResponse
       try {
-        vapidResponse = await fetch('/api/vapid-key')
+        vapidResponse = await fetch('/api/vapid-key', {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' }
+        })
         console.log('VAPID API response status:', vapidResponse.status)
       } catch (fetchErr) {
         console.error('Fetch failed:', fetchErr)
