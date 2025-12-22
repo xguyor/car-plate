@@ -22,6 +22,8 @@ export default function CameraPage() {
   const [success, setSuccess] = useState('')
   const [manualEdit, setManualEdit] = useState(false)
   const [ownerInfo, setOwnerInfo] = useState<OwnerInfo | null>(null)
+  const [isRegistered, setIsRegistered] = useState(false)
+  const [showRegisterPrompt, setShowRegisterPrompt] = useState(false)
 
   function formatPlate(value: string) {
     const digits = value.replace(/\D/g, '')
@@ -38,6 +40,10 @@ export default function CameraPage() {
 
   useEffect(() => {
     startCamera()
+    // Check if user is registered
+    const userEmail = localStorage.getItem('userEmail')
+    const userId = localStorage.getItem('userId')
+    setIsRegistered(!!(userEmail && userId))
     return () => stopCamera()
   }, [])
 
@@ -110,14 +116,19 @@ export default function CameraPage() {
   async function sendAlert() {
     if (!plate) return
 
+    // Check if user is registered
+    const senderEmail = localStorage.getItem('userEmail')
+    const senderId = localStorage.getItem('userId')
+
+    if (!senderEmail || !senderId) {
+      setShowRegisterPrompt(true)
+      return
+    }
+
     setSending(true)
     setError('')
     setSuccess('')
     setOwnerInfo(null)
-
-    // Get sender info from localStorage
-    const senderEmail = localStorage.getItem('userEmail')
-    const senderId = localStorage.getItem('userId')
 
     try {
       const response = await fetch('/api/alert', {
@@ -260,6 +271,32 @@ export default function CameraPage() {
           </div>
         )}
 
+        {/* Register Prompt */}
+        {showRegisterPrompt && (
+          <div className="mt-4 bg-yellow-500/20 border border-yellow-500/30 rounded-xl p-4">
+            <div className="flex justify-between items-start mb-3">
+              <p className="text-yellow-300 font-medium">Registration Required</p>
+              <button
+                onClick={() => setShowRegisterPrompt(false)}
+                className="text-yellow-300 hover:text-white"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-yellow-200 text-sm mb-4">
+              Please register your profile before sending alerts. This helps car owners know who to contact.
+            </p>
+            <Link
+              href="/profile"
+              className="block w-full bg-yellow-500 text-black py-3 rounded-xl font-medium text-center"
+            >
+              Go to Profile
+            </Link>
+          </div>
+        )}
+
         {/* Error Message */}
         {error && (
           <div className="mt-4 bg-red-500/20 border border-red-500/30 text-red-300 p-4 rounded-xl text-center">
@@ -298,12 +335,16 @@ export default function CameraPage() {
           <button
             onClick={sendAlert}
             disabled={sending}
-            className="w-full mt-4 bg-gradient-to-r from-red-500 to-orange-500 text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50 shadow-lg shadow-red-500/30 hover:shadow-red-500/50 transition-all flex items-center justify-center gap-2"
+            className={`w-full mt-4 text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50 shadow-lg transition-all flex items-center justify-center gap-2 ${
+              isRegistered
+                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-red-500/30 hover:shadow-red-500/50'
+                : 'bg-gradient-to-r from-gray-500 to-gray-600 shadow-gray-500/30'
+            }`}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
-            {sending ? 'Sending Alert...' : 'Send Alert'}
+            {sending ? 'Sending Alert...' : isRegistered ? 'Send Alert' : 'Send Alert (Register First)'}
           </button>
         )}
 
