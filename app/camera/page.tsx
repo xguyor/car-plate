@@ -38,6 +38,7 @@ export default function CameraPage() {
   const [ownerInfo, setOwnerInfo] = useState<OwnerInfo | null>(null)
   const [isRegistered, setIsRegistered] = useState(false)
   const [showRegisterPrompt, setShowRegisterPrompt] = useState(false)
+  const [userName, setUserName] = useState('')
 
   function formatPlate(value: string) {
     const digits = value.replace(/\D/g, '')
@@ -57,11 +58,13 @@ export default function CameraPage() {
     if (typeof window === 'undefined') return
 
     startCamera()
-    // Check if user is registered
+    // Check if user is registered and get their name
     try {
       const userEmail = localStorage.getItem('userEmail')
       const userId = localStorage.getItem('userId')
+      const storedName = localStorage.getItem('userName')
       setIsRegistered(!!(userEmail && userId))
+      setUserName(storedName || '')
     } catch (err) {
       console.error('Error checking registration:', err)
     }
@@ -285,7 +288,21 @@ export default function CameraPage() {
               <p className="text-xs text-purple-300">by Forsight Robotics</p>
             </div>
           </div>
-          <div className="flex gap-3">
+          <div className="flex items-center gap-3">
+            {/* User status indicator */}
+            {isRegistered ? (
+              <div className="flex items-center gap-2 px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-lg">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span className="text-sm text-green-300 truncate max-w-[100px]">
+                  {userName || 'Logged in'}
+                </span>
+              </div>
+            ) : (
+              <Link href="/profile" className="flex items-center gap-2 px-3 py-1 bg-yellow-500/20 border border-yellow-500/30 rounded-lg">
+                <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                <span className="text-sm text-yellow-300">Not registered</span>
+              </Link>
+            )}
             <Link href="/profile" className="p-2 rounded-xl bg-purple-700/50 hover:bg-purple-600/50 transition-colors">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
