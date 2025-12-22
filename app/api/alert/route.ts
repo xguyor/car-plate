@@ -24,8 +24,8 @@ export async function POST(request: Request) {
   try {
     const { plate, manualCorrection, confidence } = await request.json()
 
-    // Validate plate format
-    const isValid = /^\d{2}-\d{3}-\d{2}$/.test(plate) || /^\d{3}-\d{2}-\d{3}$/.test(plate)
+    // Validate plate format (7 digits: XX-XXX-XX or 8 digits: XXX-XX-XXX)
+    const isValid = /^\d{2,3}-\d{2,3}-\d{2,3}$/.test(plate) && (plate.replace(/-/g, '').length === 7 || plate.replace(/-/g, '').length === 8)
     if (!isValid) {
       return NextResponse.json({ error: 'Invalid plate format' }, { status: 400 })
     }

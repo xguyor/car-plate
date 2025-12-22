@@ -23,10 +23,12 @@ export default function ProfilePage() {
     setError('')
     setSuccess('')
 
-    // Validate plate format
-    const platePattern = /^(\d{2}-\d{3}-\d{2}|\d{3}-\d{2}-\d{3})$/
-    if (carPlate && !platePattern.test(carPlate)) {
-      setError('Invalid plate format. Use XX-XXX-XX or XXX-XX-XXX')
+    // Validate plate format (7 or 8 digits)
+    const digitsOnly = carPlate.replace(/-/g, '')
+    const platePattern = /^\d{2,3}-\d{2,3}-\d{2,3}$/
+    const validLength = digitsOnly.length === 7 || digitsOnly.length === 8
+    if (carPlate && (!platePattern.test(carPlate) || !validLength)) {
+      setError('Invalid plate format. Use XX-XXX-XX (7 digits) or XXX-XX-XXX (8 digits)')
       setSaving(false)
       return
     }
