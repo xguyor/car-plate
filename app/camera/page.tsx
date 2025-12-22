@@ -16,6 +16,24 @@ export default function CameraPage() {
   const [success, setSuccess] = useState('')
   const [manualEdit, setManualEdit] = useState(false)
 
+  function formatPlate(value: string) {
+    // Remove non-digits
+    const digits = value.replace(/\D/g, '')
+
+    // Format based on length
+    if (digits.length <= 7) {
+      // 7 digit format: XX-XXX-XX
+      if (digits.length <= 2) return digits
+      if (digits.length <= 5) return `${digits.slice(0, 2)}-${digits.slice(2)}`
+      return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5, 7)}`
+    } else {
+      // 8 digit format: XXX-XX-XXX
+      if (digits.length <= 3) return digits
+      if (digits.length <= 5) return `${digits.slice(0, 3)}-${digits.slice(3)}`
+      return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5, 8)}`
+    }
+  }
+
   useEffect(() => {
     startCamera()
     return () => stopCamera()
@@ -170,10 +188,11 @@ export default function CameraPage() {
             type="text"
             value={plate}
             onChange={(e) => {
-              setPlate(e.target.value.toUpperCase())
+              const formatted = formatPlate(e.target.value)
+              setPlate(formatted)
               setManualEdit(true)
             }}
-            placeholder="XX-XXX-XX or XXX-XX-XXX"
+            placeholder="1234567 or 12345678"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg text-center text-xl font-mono"
           />
         </div>

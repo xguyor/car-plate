@@ -18,41 +18,65 @@ export default function ProfilePage() {
     setCarPlate(savedPlate)
   }, [])
 
-  function saveProfile() {
+  async function saveProfile() {
     setSaving(true)
     setError('')
     setSuccess('')
 
-    // Validate plate format (7 or 8 digits)
-    const digitsOnly = carPlate.replace(/-/g, '')
-    const platePattern = /^\d{2,3}-\d{2,3}-\d{2,3}$/
-    const validLength = digitsOnly.length === 7 || digitsOnly.length === 8
-    if (carPlate && (!platePattern.test(carPlate) || !validLength)) {
-      setError('Invalid plate format. Use XX-XXX-XX (7 digits) or XXX-XX-XXX (8 digits)')
+    // Validate email
+    if (!email) {
+      setError('Email is required')
       setSaving(false)
       return
     }
 
-    // Save to localStorage
-    localStorage.setItem('userEmail', email)
-    localStorage.setItem('userPlate', carPlate)
+    // Validate plate format (7 or 8 digits)
+    const digitsOnly = carPlate.replace(/-/g, '')
+    if (carPlate && (digitsOnly.length < 7 || digitsOnly.length > 8)) {
+      setError('Plate must be 7 or 8 digits')
+      setSaving(false)
+      return
+    }
 
-    setSuccess('Profile saved!')
-    setSaving(false)
+    try {
+      // Save to API (which saves to Supabase)
+      const response = await fetch('/api/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, carPlate })
+      })
+
+      const data = await response.json()
+
+      if (data.error) {
+        throw new Error(data.error)
+      }
+
+      // Save to localStorage as backup
+      localStorage.setItem('userEmail', email)
+      localStorage.setItem('userPlate', carPlate)
+
+      setSuccess('Profile saved! You will receive alerts at this email.')
+    } catch (err) {
+      console.error('Save error:', err)
+      setError('Failed to save. Please try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   function formatPlate(value: string) {
     // Remove non-digits
     const digits = value.replace(/\D/g, '')
 
-    // Format as XX-XXX-XX or XXX-XX-XXX
+    // Format based on length
     if (digits.length <= 7) {
-      // Old format: XX-XXX-XX
+      // 7 digit format: XX-XXX-XX
       if (digits.length <= 2) return digits
       if (digits.length <= 5) return `${digits.slice(0, 2)}-${digits.slice(2)}`
       return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5, 7)}`
     } else {
-      // New format: XXX-XX-XXX
+      // 8 digit format: XXX-XX-XXX
       if (digits.length <= 3) return digits
       if (digits.length <= 5) return `${digits.slice(0, 3)}-${digits.slice(3)}`
       return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5, 8)}`
@@ -90,8 +114,8 @@ export default function ProfilePage() {
             type="text"
             value={carPlate}
             onChange={(e) => setCarPlate(formatPlate(e.target.value))}
-            placeholder="XX-XXX-XX or XXX-XX-XXX"
-            maxLength={10}
+            placeholder="1234567 or 12345678"
+            maxLength={11}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg text-center text-xl font-mono"
           />
           <p className="text-sm text-gray-500 mt-2">
