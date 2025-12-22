@@ -72,6 +72,33 @@ export async function POST(request: Request) {
       }, { status: 404 })
     }
 
+    // Check if there's already an active alert for this plate (prevent duplicate blocking)
+    const { data: existingAlert } = await supabase
+      .from('alerts')
+      .select('id, sender_id')
+      .eq('detected_plate', plate)
+      .neq('status', 'resolved')
+      .single()
+
+    if (existingAlert) {
+      // If the same sender is trying to block again, just return success
+      if (existingAlert.sender_id === senderId) {
+        return NextResponse.json({
+          success: true,
+          message: 'You are already blocking this car',
+          owner: {
+            name: owner.name,
+            email: owner.email,
+            phone: owner.phone
+          }
+        })
+      }
+      // Different person trying to block - this car is already being blocked
+      return NextResponse.json({
+        error: 'This car is already being blocked by someone else'
+      }, { status: 409 })
+    }
+
     // Log the alert
     console.log('Creating alert - senderId:', senderId, 'receiverId:', owner.id, 'plate:', plate)
     const { error: alertError } = await supabase
