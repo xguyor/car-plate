@@ -22,16 +22,33 @@ try {
 
 export async function POST(request: Request) {
   try {
-    const { plate, manualCorrection, confidence } = await request.json()
+    const { plate, manualCorrection, confidence, senderEmail, senderId } = await request.json()
 
-    // Validate plate format (7 digits: XX-XXX-XX or 8 digits: XXX-XX-XXX)
-    const isValid = /^\d{2,3}-\d{2,3}-\d{2,3}$/.test(plate) && (plate.replace(/-/g, '').length === 7 || plate.replace(/-/g, '').length === 8)
-    if (!isValid) {
+    // Validate plate format (7 or 8 digits)
+    const digitsOnly = plate.replace(/-/g, '')
+    if (digitsOnly.length < 7 || digitsOnly.length > 8) {
       return NextResponse.json({ error: 'Invalid plate format' }, { status: 400 })
     }
 
-    // Find car owner by plate in Supabase
     const supabase = await createServerSupabaseClient()
+
+    // Get sender info if available
+    let senderName = 'Someone'
+    let senderPhone = ''
+    if (senderEmail) {
+      const { data: sender } = await supabase
+        .from('users')
+        .select('name, phone')
+        .eq('email', senderEmail)
+        .single()
+
+      if (sender) {
+        senderName = sender.name || senderEmail
+        senderPhone = sender.phone || ''
+      }
+    }
+
+    // Find car owner by plate in Supabase
     const { data: owner, error: ownerError } = await supabase
       .from('users')
       .select('*')
@@ -48,6 +65,7 @@ export async function POST(request: Request) {
     await supabase
       .from('alerts')
       .insert({
+        sender_id: senderId || null,
         receiver_id: owner.id,
         detected_plate: plate,
         manual_correction: manualCorrection,
@@ -55,24 +73,38 @@ export async function POST(request: Request) {
       })
 
     // Send email notification
-    if (resend) {
+    if (resend && owner.email) {
       try {
         await resend.emails.send({
           from: 'CarBlock Alert <onboarding@resend.dev>',
           to: owner.email,
-          subject: 'URGENT: Your car is blocking someone',
+          subject: 'URGENT: Your car is blocking someone!',
           html: `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #2563eb;">Your Car is Blocking</h2>
-              <p>Hi,</p>
-              <p>Your car with plate number <strong>${plate}</strong> is blocking someone at the parking lot.</p>
-              <p>Please move it as soon as possible.</p>
-              <p style="color: #666; font-size: 12px; margin-top: 20px;">
-                Sent via CarBlock Alert System
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #581c87, #86198f); padding: 30px; border-radius: 16px;">
+              <h1 style="color: white; margin: 0 0 20px 0; font-size: 24px;">Your Car is Blocking!</h1>
+
+              <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+                <p style="color: #e9d5ff; margin: 0 0 10px 0; font-size: 14px;">License Plate</p>
+                <p style="color: white; margin: 0; font-size: 28px; font-family: monospace; font-weight: bold;">${plate}</p>
+              </div>
+
+              <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+                <p style="color: #e9d5ff; margin: 0 0 10px 0; font-size: 14px;">Reported by</p>
+                <p style="color: white; margin: 0; font-size: 18px; font-weight: bold;">${senderName}</p>
+                ${senderPhone ? `<a href="tel:${senderPhone}" style="color: #a855f7; text-decoration: none; font-size: 16px;">${senderPhone}</a>` : ''}
+              </div>
+
+              <p style="color: #e9d5ff; font-size: 14px; margin-top: 20px;">
+                Please move your car as soon as possible.
+              </p>
+
+              <p style="color: #9333ea; font-size: 12px; margin-top: 30px;">
+                Sent via CarBlock by Forsight Robotics
               </p>
             </div>
           `
         })
+        console.log('Email sent to:', owner.email)
       } catch (emailError) {
         console.error('Email failed:', emailError)
       }
@@ -84,13 +116,14 @@ export async function POST(request: Request) {
         await webpush.sendNotification(
           owner.push_subscription,
           JSON.stringify({
-            title: 'Move Your Car',
-            body: `Your car (${plate}) is blocking someone`,
+            title: 'Move Your Car!',
+            body: `${senderName} says your car (${plate}) is blocking them`,
             icon: '/icon-192.png',
             badge: '/icon-192.png',
-            data: { url: '/history' }
+            data: { url: '/camera' }
           })
         )
+        console.log('Push notification sent')
       } catch (pushError) {
         console.error('Push notification failed:', pushError)
       }
@@ -98,7 +131,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      owner: owner.email
+      owner: {
+        name: owner.name,
+        email: owner.email,
+        phone: owner.phone
+      }
     })
 
   } catch (error: unknown) {

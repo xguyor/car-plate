@@ -3,6 +3,12 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 
+interface OwnerInfo {
+  name?: string
+  email: string
+  phone?: string
+}
+
 export default function CameraPage() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -15,19 +21,15 @@ export default function CameraPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [manualEdit, setManualEdit] = useState(false)
+  const [ownerInfo, setOwnerInfo] = useState<OwnerInfo | null>(null)
 
   function formatPlate(value: string) {
-    // Remove non-digits
     const digits = value.replace(/\D/g, '')
-
-    // Format based on length
     if (digits.length <= 7) {
-      // 7 digit format: XX-XXX-XX
       if (digits.length <= 2) return digits
       if (digits.length <= 5) return `${digits.slice(0, 2)}-${digits.slice(2)}`
       return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5, 7)}`
     } else {
-      // 8 digit format: XXX-XX-XXX
       if (digits.length <= 3) return digits
       if (digits.length <= 5) return `${digits.slice(0, 3)}-${digits.slice(3)}`
       return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5, 8)}`
@@ -67,6 +69,7 @@ export default function CameraPage() {
     setLoading(true)
     setError('')
     setPlate('')
+    setOwnerInfo(null)
 
     try {
       const video = videoRef.current
@@ -110,6 +113,11 @@ export default function CameraPage() {
     setSending(true)
     setError('')
     setSuccess('')
+    setOwnerInfo(null)
+
+    // Get sender info from localStorage
+    const senderEmail = localStorage.getItem('userEmail')
+    const senderId = localStorage.getItem('userId')
 
     try {
       const response = await fetch('/api/alert', {
@@ -118,7 +126,9 @@ export default function CameraPage() {
         body: JSON.stringify({
           plate,
           manualCorrection: manualEdit,
-          confidence
+          confidence,
+          senderEmail,
+          senderId
         })
       })
 
@@ -127,9 +137,8 @@ export default function CameraPage() {
       if (data.error) {
         setError(data.error)
       } else {
-        setSuccess(`Alert sent to ${data.owner}!`)
-        setPlate('')
-        setConfidence(0)
+        setOwnerInfo(data.owner)
+        setSuccess(`Alert sent!`)
       }
     } catch (err) {
       console.log('Alert error:', err)
@@ -140,21 +149,40 @@ export default function CameraPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gradient-to-b from-purple-900 to-purple-950">
       {/* Header */}
-      <div className="bg-blue-600 text-white p-4">
-        <div className="flex justify-between items-center">
-          <h1 className="text-xl font-bold">CarBlock Alert</h1>
-          <div className="flex gap-4">
-            <Link href="/profile" className="text-sm hover:underline">Profile</Link>
-            <Link href="/history" className="text-sm hover:underline">History</Link>
+      <div className="bg-purple-800/50 backdrop-blur-sm text-white p-4 sticky top-0 z-10">
+        <div className="flex justify-between items-center max-w-md mx-auto">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-lg font-bold">CarBlock</h1>
+              <p className="text-xs text-purple-300">by Forsight Robotics</p>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <Link href="/profile" className="p-2 rounded-xl bg-purple-700/50 hover:bg-purple-600/50 transition-colors">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </Link>
+            <Link href="/history" className="p-2 rounded-xl bg-purple-700/50 hover:bg-purple-600/50 transition-colors">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </Link>
           </div>
         </div>
       </div>
 
-      {/* Camera View */}
-      <div className="p-4">
-        <div className="bg-black rounded-lg overflow-hidden relative aspect-video">
+      {/* Main Content */}
+      <div className="p-4 max-w-md mx-auto">
+        {/* Camera View */}
+        <div className="bg-black rounded-2xl overflow-hidden relative aspect-[4/3] shadow-2xl shadow-purple-500/20">
           <video
             ref={videoRef}
             autoPlay
@@ -164,8 +192,25 @@ export default function CameraPage() {
           <canvas ref={canvasRef} className="hidden" />
 
           {!hasCamera && (
-            <div className="absolute inset-0 flex items-center justify-center text-white text-center p-4">
-              <p>Camera not available. Enable camera access or enter plate manually.</p>
+            <div className="absolute inset-0 flex items-center justify-center bg-purple-900/80 text-white text-center p-6">
+              <div>
+                <svg className="w-16 h-16 mx-auto mb-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <p className="text-purple-200">Camera not available</p>
+                <p className="text-sm text-purple-400 mt-1">Enter plate manually below</p>
+              </div>
+            </div>
+          )}
+
+          {/* Scanning overlay */}
+          {loading && (
+            <div className="absolute inset-0 bg-purple-900/50 flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-16 h-16 border-4 border-purple-400 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                <p className="text-white mt-4 font-medium">Scanning plate...</p>
+              </div>
             </div>
           )}
         </div>
@@ -174,15 +219,18 @@ export default function CameraPage() {
         <button
           onClick={captureAndDetect}
           disabled={loading || !hasCamera}
-          className="w-full mt-4 bg-blue-600 text-white py-4 rounded-lg font-semibold text-lg disabled:opacity-50"
+          className="w-full mt-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all flex items-center justify-center gap-2"
         >
-          {loading ? 'Detecting...' : 'Capture & Detect Plate'}
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+          </svg>
+          {loading ? 'Scanning...' : 'Scan Plate'}
         </button>
 
         {/* Manual Entry */}
-        <div className="mt-4">
-          <label className="block text-sm text-gray-600 mb-1">
-            Or enter plate manually:
+        <div className="mt-6">
+          <label className="block text-sm text-purple-300 mb-2 text-center">
+            Or enter plate manually
           </label>
           <input
             type="text"
@@ -191,45 +239,86 @@ export default function CameraPage() {
               const formatted = formatPlate(e.target.value)
               setPlate(formatted)
               setManualEdit(true)
+              setOwnerInfo(null)
             }}
-            placeholder="1234567 or 12345678"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-center text-xl font-mono"
+            placeholder="1234567"
+            className="w-full px-4 py-4 bg-purple-900/50 border border-purple-500/30 rounded-xl text-white text-center text-2xl font-mono placeholder-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-400"
           />
         </div>
 
         {/* Detected Plate Display */}
         {plate && !manualEdit && (
-          <div className="mt-4 bg-white rounded-lg p-4 text-center">
-            <p className="text-sm text-gray-600 mb-1">Detected Plate:</p>
-            <p className="text-3xl font-mono font-bold">{plate}</p>
-            <p className="text-sm text-gray-500 mt-1">
-              Confidence: {(confidence * 100).toFixed(0)}%
-            </p>
+          <div className="mt-4 bg-white/10 backdrop-blur-sm rounded-2xl p-4 text-center border border-purple-500/30">
+            <p className="text-sm text-purple-300 mb-1">Detected Plate</p>
+            <p className="text-3xl font-mono font-bold text-white">{plate}</p>
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <div className={`w-2 h-2 rounded-full ${confidence > 0.7 ? 'bg-green-400' : confidence > 0.4 ? 'bg-yellow-400' : 'bg-red-400'}`}></div>
+              <p className="text-sm text-purple-300">
+                {(confidence * 100).toFixed(0)}% confidence
+              </p>
+            </div>
           </div>
         )}
 
         {/* Error Message */}
         {error && (
-          <div className="mt-4 bg-red-50 text-red-600 p-3 rounded-lg text-center">
+          <div className="mt-4 bg-red-500/20 border border-red-500/30 text-red-300 p-4 rounded-xl text-center">
             {error}
           </div>
         )}
 
-        {/* Success Message */}
+        {/* Success Message with Owner Info */}
         {success && (
-          <div className="mt-4 bg-green-50 text-green-600 p-3 rounded-lg text-center">
-            {success}
+          <div className="mt-4 bg-green-500/20 border border-green-500/30 p-4 rounded-xl">
+            <p className="text-green-300 text-center font-medium mb-3">{success}</p>
+            {ownerInfo && (
+              <div className="bg-white/10 rounded-xl p-4 space-y-3">
+                <p className="text-white font-medium text-center">Owner Notified</p>
+                {ownerInfo.name && (
+                  <p className="text-purple-200 text-center">{ownerInfo.name}</p>
+                )}
+                {ownerInfo.phone && (
+                  <a
+                    href={`tel:${ownerInfo.phone}`}
+                    className="flex items-center justify-center gap-2 bg-green-500 text-white py-3 rounded-xl font-medium"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    </svg>
+                    Call {ownerInfo.phone}
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         )}
 
         {/* Send Alert Button */}
-        {plate && (
+        {plate && !success && (
           <button
             onClick={sendAlert}
             disabled={sending}
-            className="w-full mt-4 bg-red-600 text-white py-4 rounded-lg font-semibold text-lg disabled:opacity-50"
+            className="w-full mt-4 bg-gradient-to-r from-red-500 to-orange-500 text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50 shadow-lg shadow-red-500/30 hover:shadow-red-500/50 transition-all flex items-center justify-center gap-2"
           >
-            {sending ? 'Sending...' : 'Send Alert to Owner'}
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            {sending ? 'Sending Alert...' : 'Send Alert'}
+          </button>
+        )}
+
+        {/* Reset Button */}
+        {success && (
+          <button
+            onClick={() => {
+              setPlate('')
+              setSuccess('')
+              setOwnerInfo(null)
+              setConfidence(0)
+            }}
+            className="w-full mt-4 bg-purple-700/50 text-white py-4 rounded-xl font-medium"
+          >
+            Scan Another Plate
           </button>
         )}
       </div>

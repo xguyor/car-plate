@@ -3,7 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 
 export async function POST(request: Request) {
   try {
-    const { email, carPlate } = await request.json()
+    const { name, email, phone, carPlate, pushSubscription } = await request.json()
 
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
@@ -18,12 +18,17 @@ export async function POST(request: Request) {
       .eq('email', email)
       .single()
 
+    let userId = existingUser?.id
+
     if (existingUser) {
       // Update existing user
       const { error: updateError } = await supabase
         .from('users')
         .update({
+          name: name || null,
+          phone: phone || null,
           car_plate: carPlate || null,
+          push_subscription: pushSubscription || null,
           updated_at: new Date().toISOString()
         })
         .eq('email', email)
@@ -31,18 +36,22 @@ export async function POST(request: Request) {
       if (updateError) throw updateError
     } else {
       // Insert new user
+      userId = crypto.randomUUID()
       const { error: insertError } = await supabase
         .from('users')
         .insert({
-          id: crypto.randomUUID(),
+          id: userId,
+          name: name || null,
           email: email,
-          car_plate: carPlate || null
+          phone: phone || null,
+          car_plate: carPlate || null,
+          push_subscription: pushSubscription || null
         })
 
       if (insertError) throw insertError
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, userId })
 
   } catch (error: unknown) {
     console.error('Profile save error:', error)
