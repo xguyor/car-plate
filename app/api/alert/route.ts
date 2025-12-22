@@ -5,16 +5,23 @@ import webpush from 'web-push'
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
-// Configure VAPID for Web Push (only if valid keys are provided)
+// Hardcoded VAPID keys (public key is safe to expose, private should be in env but hardcoding for reliability)
+const VAPID_PUBLIC_KEY = 'BEXb7h-x0dmbvwN2TAwg9jWAONGrRZ0Z9qWp4bkRu625o_J43QTYXkhnNHLnt_-iL4ms-5iNf-MVC77OMPwgAUI'
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY?.trim() || ''
+
+// Configure VAPID for Web Push
 let webPushConfigured = false
 try {
-  if (process.env.VAPID_PRIVATE_KEY && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+  if (VAPID_PRIVATE_KEY) {
     webpush.setVapidDetails(
       'mailto:alerts@carblock.app',
-      process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-      process.env.VAPID_PRIVATE_KEY
+      VAPID_PUBLIC_KEY,
+      VAPID_PRIVATE_KEY
     )
     webPushConfigured = true
+    console.log('Web push configured successfully')
+  } else {
+    console.warn('VAPID_PRIVATE_KEY not set')
   }
 } catch (e) {
   console.warn('Web push not configured:', e)
