@@ -65,8 +65,10 @@ export default function ProfilePage() {
         applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
       })
 
-      // Save subscription to localStorage
-      localStorage.setItem('pushSubscription', JSON.stringify(subscription))
+      // Save subscription to localStorage - use toJSON() for proper serialization
+      const subscriptionJson = subscription.toJSON()
+      localStorage.setItem('pushSubscription', JSON.stringify(subscriptionJson))
+      console.log('Push subscription saved:', subscriptionJson.endpoint?.substring(0, 50))
       return subscription
     } catch (err) {
       console.error('Notification error:', err)
@@ -96,14 +98,19 @@ export default function ProfilePage() {
     try {
       // Get existing subscription or try to get a new one if notifications enabled
       let pushSubscription = localStorage.getItem('pushSubscription')
+      console.log('Save profile - existing pushSubscription in localStorage:', !!pushSubscription)
 
       // If notifications are enabled but no subscription, get one
       if (notificationsEnabled && !pushSubscription) {
+        console.log('Notifications enabled but no subscription, getting one...')
         const subscription = await enableNotifications()
         if (subscription) {
-          pushSubscription = JSON.stringify(subscription)
+          pushSubscription = JSON.stringify(subscription.toJSON())
         }
       }
+
+      const parsedSubscription = pushSubscription ? JSON.parse(pushSubscription) : null
+      console.log('Sending to API - pushSubscription:', parsedSubscription ? 'yes' : 'no')
 
       const response = await fetch('/api/profile', {
         method: 'POST',
@@ -113,7 +120,7 @@ export default function ProfilePage() {
           email,
           phone,
           carPlate,
-          pushSubscription: pushSubscription ? JSON.parse(pushSubscription) : null
+          pushSubscription: parsedSubscription
         })
       })
 

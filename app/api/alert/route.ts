@@ -111,8 +111,12 @@ export async function POST(request: Request) {
     }
 
     // Send push notification
+    console.log('Push check - webPushConfigured:', webPushConfigured)
+    console.log('Push check - owner.push_subscription exists:', !!owner.push_subscription)
+
     if (owner.push_subscription && webPushConfigured) {
       try {
+        console.log('Sending push to subscription:', JSON.stringify(owner.push_subscription).substring(0, 100))
         await webpush.sendNotification(
           owner.push_subscription,
           JSON.stringify({
@@ -123,10 +127,12 @@ export async function POST(request: Request) {
             data: { url: '/camera' }
           })
         )
-        console.log('Push notification sent')
+        console.log('Push notification sent successfully')
       } catch (pushError) {
         console.error('Push notification failed:', pushError)
       }
+    } else {
+      console.log('Push notification skipped - no subscription or not configured')
     }
 
     return NextResponse.json({

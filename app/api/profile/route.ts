@@ -5,6 +5,12 @@ export async function POST(request: Request) {
   try {
     const { name, email, phone, carPlate, pushSubscription } = await request.json()
 
+    console.log('Profile save - email:', email)
+    console.log('Profile save - pushSubscription received:', !!pushSubscription)
+    if (pushSubscription) {
+      console.log('Profile save - subscription endpoint:', pushSubscription.endpoint?.substring(0, 50))
+    }
+
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
     }
