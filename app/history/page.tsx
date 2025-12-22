@@ -19,7 +19,9 @@ export default function HistoryPage() {
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // Default to 'sent' tab if user has sent alerts but no received alerts
   const [activeTab, setActiveTab] = useState<'received' | 'sent'>('received')
+  const [initialTabSet, setInitialTabSet] = useState(false)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -42,7 +44,20 @@ export default function HistoryPage() {
       if (data.error) {
         setError(data.error)
       } else {
-        setAlerts(data.alerts || [])
+        const alertsList = data.alerts || []
+        setAlerts(alertsList)
+
+        // Auto-select the tab that has alerts (prefer sent if user just blocked someone)
+        if (!initialTabSet && alertsList.length > 0) {
+          const sentAlerts = alertsList.filter((a: Alert) => a.type === 'sent')
+          const receivedAlerts = alertsList.filter((a: Alert) => a.type === 'received')
+
+          // If user has sent alerts but no received alerts, show sent tab
+          if (sentAlerts.length > 0 && receivedAlerts.length === 0) {
+            setActiveTab('sent')
+          }
+          setInitialTabSet(true)
+        }
       }
     } catch (err) {
       console.error('Error loading alerts:', err)
@@ -80,6 +95,8 @@ export default function HistoryPage() {
   }
 
   const filteredAlerts = alerts.filter(a => a.type === activeTab)
+  const receivedCount = alerts.filter(a => a.type === 'received' && a.status !== 'resolved').length
+  const sentCount = alerts.filter(a => a.type === 'sent' && a.status !== 'resolved').length
 
   function formatDate(dateString: string) {
     const date = new Date(dateString)
@@ -153,23 +170,37 @@ export default function HistoryPage() {
         <div className="flex bg-purple-800/30 rounded-xl p-1">
           <button
             onClick={() => setActiveTab('received')}
-            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
               activeTab === 'received'
                 ? 'bg-purple-500 text-white shadow-lg'
                 : 'text-purple-300 hover:text-white'
             }`}
           >
             Blocked by Others
+            {receivedCount > 0 && (
+              <span className={`px-1.5 py-0.5 text-xs rounded-full ${
+                activeTab === 'received' ? 'bg-white/20' : 'bg-purple-500/50'
+              }`}>
+                {receivedCount}
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab('sent')}
-            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
               activeTab === 'sent'
                 ? 'bg-purple-500 text-white shadow-lg'
                 : 'text-purple-300 hover:text-white'
             }`}
           >
             Cars I Blocked
+            {sentCount > 0 && (
+              <span className={`px-1.5 py-0.5 text-xs rounded-full ${
+                activeTab === 'sent' ? 'bg-white/20' : 'bg-purple-500/50'
+              }`}>
+                {sentCount}
+              </span>
+            )}
           </button>
         </div>
       </div>

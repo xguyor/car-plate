@@ -161,6 +161,28 @@ export default function ProfilePage() {
         setCarPlate(data.user.carPlate || '')
         setSuccess('Welcome back!')
         setViewMode('edit')
+
+        // Sync push subscription if available
+        const existingSubscription = localStorage.getItem('pushSubscription')
+        if (existingSubscription) {
+          try {
+            await fetch('/api/profile', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: data.user.name,
+                email: data.user.email,
+                phone: data.user.phone,
+                carPlate: data.user.carPlate,
+                pushSubscription: JSON.parse(existingSubscription),
+                existingUserId: data.user.id
+              })
+            })
+            console.log('Push subscription synced on login')
+          } catch (syncErr) {
+            console.error('Failed to sync push subscription:', syncErr)
+          }
+        }
       } else {
         // User not found - show registration
         setPhone(loginPhone)
