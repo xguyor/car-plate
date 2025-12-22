@@ -61,14 +61,21 @@ export default function ProfilePage() {
       return null
     }
 
-    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-    if (!vapidPublicKey) {
-      setError('Push notifications not configured')
-      console.error('NEXT_PUBLIC_VAPID_PUBLIC_KEY is not set')
-      return null
-    }
-
     try {
+      // Fetch VAPID key from API
+      console.log('Fetching VAPID key from API...')
+      const vapidResponse = await fetch('/api/vapid-key')
+      const vapidData = await vapidResponse.json()
+
+      if (!vapidData.vapidPublicKey) {
+        setError('Push notifications not configured on server')
+        console.error('VAPID key not available:', vapidData.error)
+        return null
+      }
+
+      const vapidPublicKey = vapidData.vapidPublicKey
+      console.log('Got VAPID key:', vapidPublicKey.substring(0, 20) + '...')
+
       const permission = await Notification.requestPermission()
       console.log('Notification permission:', permission)
 
@@ -84,7 +91,7 @@ export default function ProfilePage() {
       await navigator.serviceWorker.ready
       console.log('Service worker ready')
 
-      console.log('Subscribing to push with VAPID key:', vapidPublicKey.substring(0, 20) + '...')
+      console.log('Subscribing to push...')
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
