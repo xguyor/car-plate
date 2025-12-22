@@ -24,9 +24,9 @@ interface ActiveAlert {
 export default function CameraPage() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const cameraStartedRef = useRef(false)
 
   const [hasCamera, setHasCamera] = useState(false)
-  const [cameraStarted, setCameraStarted] = useState(false)
   const [plate, setPlate] = useState('')
   const [confidence, setConfidence] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -131,19 +131,11 @@ export default function CameraPage() {
   }, [loadActiveAlerts])
 
   async function startCamera() {
-    // Prevent multiple camera starts
-    if (cameraStarted) return
-    setCameraStarted(true)
+    // Prevent multiple camera starts in same session
+    if (cameraStartedRef.current) return
+    cameraStartedRef.current = true
 
     try {
-      // Check if camera was previously denied (stored in localStorage)
-      const cameraDenied = localStorage.getItem('cameraDenied')
-      if (cameraDenied === 'true') {
-        console.log('Camera was previously denied')
-        setHasCamera(false)
-        return
-      }
-
       // Check if we already have an active stream
       if (videoRef.current?.srcObject) {
         const existingStream = videoRef.current.srcObject as MediaStream
@@ -159,15 +151,10 @@ export default function CameraPage() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         setHasCamera(true)
-        localStorage.setItem('cameraDenied', 'false')
       }
     } catch (err) {
       console.log('Camera error:', err)
       setHasCamera(false)
-      // Store that camera was denied so we don't ask again
-      if (err instanceof Error && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
-        localStorage.setItem('cameraDenied', 'true')
-      }
     }
   }
 
