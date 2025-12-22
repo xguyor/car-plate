@@ -64,12 +64,34 @@ export default function ProfilePage() {
     try {
       // Fetch VAPID key from API
       console.log('Fetching VAPID key from API...')
-      const vapidResponse = await fetch('/api/vapid-key')
-      const vapidData = await vapidResponse.json()
+      let vapidResponse
+      try {
+        vapidResponse = await fetch('/api/vapid-key')
+        console.log('VAPID API response status:', vapidResponse.status)
+      } catch (fetchErr) {
+        console.error('Fetch failed:', fetchErr)
+        setError(`Network error fetching VAPID key: ${fetchErr instanceof Error ? fetchErr.message : 'Unknown'}`)
+        return null
+      }
+
+      if (!vapidResponse.ok) {
+        setError(`VAPID API error: ${vapidResponse.status}`)
+        return null
+      }
+
+      let vapidData
+      try {
+        vapidData = await vapidResponse.json()
+        console.log('VAPID API response:', JSON.stringify(vapidData))
+      } catch (jsonErr) {
+        console.error('JSON parse failed:', jsonErr)
+        setError('Failed to parse VAPID response')
+        return null
+      }
 
       if (!vapidData.vapidPublicKey) {
-        setError('Push notifications not configured on server')
-        console.error('VAPID key not available:', vapidData.error)
+        setError(`VAPID key missing. Response: ${JSON.stringify(vapidData)}`)
+        console.error('VAPID key not available:', vapidData)
         return null
       }
 
@@ -108,6 +130,8 @@ export default function ProfilePage() {
     } catch (err) {
       console.error('Notification error:', err)
       const errorMsg = err instanceof Error ? err.message : 'Unknown error'
+      // Show alert for easier debugging on mobile
+      alert(`Push error: ${errorMsg}`)
       setError(`Failed to enable notifications: ${errorMsg}`)
       return null
     }
