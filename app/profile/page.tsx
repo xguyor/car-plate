@@ -70,30 +70,38 @@ export default function ProfilePage() {
 
     try {
       const permission = await Notification.requestPermission()
+      console.log('Notification permission:', permission)
+
       if (permission !== 'granted') {
         setError('Please allow notifications to receive alerts')
         return null
       }
 
-      setNotificationsEnabled(true)
-
       // Register service worker and get push subscription
+      console.log('Registering service worker...')
       const registration = await navigator.serviceWorker.register('/sw.js')
+      console.log('Service worker registered, waiting for ready...')
       await navigator.serviceWorker.ready
+      console.log('Service worker ready')
 
+      console.log('Subscribing to push with VAPID key:', vapidPublicKey.substring(0, 20) + '...')
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
       })
+      console.log('Push subscription created!')
 
       // Save subscription to localStorage - use toJSON() for proper serialization
       const subscriptionJson = subscription.toJSON()
       localStorage.setItem('pushSubscription', JSON.stringify(subscriptionJson))
-      console.log('Push subscription saved:', subscriptionJson.endpoint?.substring(0, 50))
+      console.log('Push subscription saved to localStorage:', subscriptionJson.endpoint?.substring(0, 50))
+
+      setNotificationsEnabled(true)
       return subscription
     } catch (err) {
       console.error('Notification error:', err)
-      setError('Failed to enable notifications')
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error'
+      setError(`Failed to enable notifications: ${errorMsg}`)
       return null
     }
   }
