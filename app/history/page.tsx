@@ -327,9 +327,29 @@ export default function HistoryPage() {
                     )}
 
                     {activeTab === 'received' && alert.status === 'leaving_soon' && (
-                      <div className="text-center text-orange-300 text-sm">
+                      <div className="text-center text-orange-300 text-sm mb-2">
                         Waiting for the blocker to move...
                       </div>
+                    )}
+
+                    {/* Dismiss button for received alerts */}
+                    {activeTab === 'received' && (
+                      <button
+                        onClick={() => updateAlertStatus(alert.id, 'resolved')}
+                        disabled={updatingId === alert.id}
+                        className="w-full bg-gray-600 hover:bg-gray-500 text-white py-2 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
+                      >
+                        {updatingId === alert.id ? (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            Dismiss (They Left)
+                          </>
+                        )}
+                      </button>
                     )}
 
                     {activeTab === 'sent' && (
