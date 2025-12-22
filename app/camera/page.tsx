@@ -156,6 +156,16 @@ export default function CameraPage() {
 
   async function startCamera() {
     try {
+      // Check if we already have permission
+      const permissionStatus = await navigator.permissions?.query({ name: 'camera' as PermissionName }).catch(() => null)
+
+      // If permission was denied, don't keep asking
+      if (permissionStatus?.state === 'denied') {
+        console.log('Camera permission denied')
+        setHasCamera(false)
+        return
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' }
       })
