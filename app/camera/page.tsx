@@ -39,11 +39,18 @@ export default function CameraPage() {
   }
 
   useEffect(() => {
+    // Ensure we're in the browser
+    if (typeof window === 'undefined') return
+
     startCamera()
     // Check if user is registered
-    const userEmail = localStorage.getItem('userEmail')
-    const userId = localStorage.getItem('userId')
-    setIsRegistered(!!(userEmail && userId))
+    try {
+      const userEmail = localStorage.getItem('userEmail')
+      const userId = localStorage.getItem('userId')
+      setIsRegistered(!!(userEmail && userId))
+    } catch (err) {
+      console.error('Error checking registration:', err)
+    }
     return () => stopCamera()
   }, [])
 
@@ -117,8 +124,14 @@ export default function CameraPage() {
     if (!plate) return
 
     // Check if user is registered
-    const senderEmail = localStorage.getItem('userEmail')
-    const senderId = localStorage.getItem('userId')
+    let senderEmail: string | null = null
+    let senderId: string | null = null
+    try {
+      senderEmail = localStorage.getItem('userEmail')
+      senderId = localStorage.getItem('userId')
+    } catch (err) {
+      console.error('Error accessing localStorage:', err)
+    }
 
     if (!senderEmail || !senderId) {
       setShowRegisterPrompt(true)

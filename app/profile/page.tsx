@@ -17,27 +17,34 @@ export default function ProfilePage() {
   const [showIOSInstall, setShowIOSInstall] = useState(false)
 
   useEffect(() => {
-    // Load from localStorage
-    setName(localStorage.getItem('userName') || '')
-    setEmail(localStorage.getItem('userEmail') || '')
-    setPhone(localStorage.getItem('userPhone') || '')
-    setCarPlate(localStorage.getItem('userPlate') || '')
+    // Ensure we're in the browser
+    if (typeof window === 'undefined') return
 
-    // Check notification permission
-    if ('Notification' in window) {
-      setNotificationsEnabled(Notification.permission === 'granted')
-    }
+    try {
+      // Load from localStorage
+      setName(localStorage.getItem('userName') || '')
+      setEmail(localStorage.getItem('userEmail') || '')
+      setPhone(localStorage.getItem('userPhone') || '')
+      setCarPlate(localStorage.getItem('userPlate') || '')
 
-    // Detect iOS and standalone mode
-    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent)
-    const standalone = window.matchMedia('(display-mode: standalone)').matches ||
-                       (navigator as Navigator & { standalone?: boolean }).standalone === true
-    setIsIOS(ios)
-    setIsStandalone(standalone)
+      // Check notification permission
+      if ('Notification' in window) {
+        setNotificationsEnabled(Notification.permission === 'granted')
+      }
 
-    // Show iOS install prompt if iOS + not standalone + notifications not enabled
-    if (ios && !standalone && Notification.permission !== 'granted') {
-      setShowIOSInstall(true)
+      // Detect iOS and standalone mode
+      const ios = /iPad|iPhone|iPod/.test(navigator.userAgent)
+      const standalone = window.matchMedia('(display-mode: standalone)').matches ||
+                         (navigator as Navigator & { standalone?: boolean }).standalone === true
+      setIsIOS(ios)
+      setIsStandalone(standalone)
+
+      // Show iOS install prompt if iOS + not standalone + notifications not enabled
+      if (ios && !standalone && Notification.permission !== 'granted') {
+        setShowIOSInstall(true)
+      }
+    } catch (err) {
+      console.error('Error loading profile data:', err)
     }
   }, [])
 
