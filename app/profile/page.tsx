@@ -105,7 +105,7 @@ export default function ProfilePage() {
         return null
       }
 
-      const vapidPublicKey = vapidData.vapidPublicKey
+      const vapidPublicKey = vapidData.vapidPublicKey.trim()
       console.log('Got VAPID key:', vapidPublicKey.substring(0, 20) + '...')
 
       const permission = await Notification.requestPermission()
