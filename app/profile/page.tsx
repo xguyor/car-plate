@@ -26,31 +26,37 @@ export default function ProfilePage() {
     }
   }, [])
 
-  async function enableNotifications() {
-    if (!('Notification' in window)) {
-      setError('Push notifications not supported')
-      return
+  async function enableNotifications(): Promise<PushSubscription | null> {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      setError('Push notifications not supported on this browser')
+      return null
     }
 
     try {
       const permission = await Notification.requestPermission()
-      if (permission === 'granted') {
-        setNotificationsEnabled(true)
-
-        // Register service worker and get push subscription
-        if ('serviceWorker' in navigator) {
-          const registration = await navigator.serviceWorker.register('/sw.js')
-          const subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-          })
-
-          // Save subscription to profile
-          localStorage.setItem('pushSubscription', JSON.stringify(subscription))
-        }
+      if (permission !== 'granted') {
+        setError('Please allow notifications to receive alerts')
+        return null
       }
+
+      setNotificationsEnabled(true)
+
+      // Register service worker and get push subscription
+      const registration = await navigator.serviceWorker.register('/sw.js')
+      await navigator.serviceWorker.ready
+
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+      })
+
+      // Save subscription to localStorage
+      localStorage.setItem('pushSubscription', JSON.stringify(subscription))
+      return subscription
     } catch (err) {
       console.error('Notification error:', err)
+      setError('Failed to enable notifications')
+      return null
     }
   }
 
@@ -73,7 +79,16 @@ export default function ProfilePage() {
     }
 
     try {
-      const pushSubscription = localStorage.getItem('pushSubscription')
+      // Get existing subscription or try to get a new one if notifications enabled
+      let pushSubscription = localStorage.getItem('pushSubscription')
+
+      // If notifications are enabled but no subscription, get one
+      if (notificationsEnabled && !pushSubscription) {
+        const subscription = await enableNotifications()
+        if (subscription) {
+          pushSubscription = JSON.stringify(subscription)
+        }
+      }
 
       const response = await fetch('/api/profile', {
         method: 'POST',
@@ -211,7 +226,12 @@ export default function ProfilePage() {
               <p className="text-sm text-purple-300">Get instant alerts on your phone</p>
             </div>
             <button
-              onClick={enableNotifications}
+              onClick={async () => {
+                const subscription = await enableNotifications()
+                if (subscription) {
+                  setSuccess('Notifications enabled! Save your profile to activate.')
+                }
+              }}
               disabled={notificationsEnabled}
               className={`px-4 py-2 rounded-xl font-medium ${
                 notificationsEnabled
