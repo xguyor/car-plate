@@ -1,13 +1,9 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export default function CameraPage() {
-  const supabase = createClient()
-  const router = useRouter()
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -21,17 +17,9 @@ export default function CameraPage() {
   const [manualEdit, setManualEdit] = useState(false)
 
   useEffect(() => {
-    checkAuth()
     startCamera()
     return () => stopCamera()
   }, [])
-
-  async function checkAuth() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      router.push('/')
-    }
-  }
 
   async function startCamera() {
     try {
@@ -43,7 +31,7 @@ export default function CameraPage() {
         setHasCamera(true)
       }
     } catch (err) {
-      setError('Camera access denied. Please allow camera access.')
+      console.log('Camera error:', err)
       setHasCamera(false)
     }
   }
@@ -91,6 +79,7 @@ export default function CameraPage() {
         setError('No plate detected. Try again or enter manually.')
       }
     } catch (err) {
+      console.log('OCR error:', err)
       setError('Failed to process image')
     } finally {
       setLoading(false)
@@ -125,15 +114,11 @@ export default function CameraPage() {
         setConfidence(0)
       }
     } catch (err) {
+      console.log('Alert error:', err)
       setError('Failed to send alert')
     } finally {
       setSending(false)
     }
-  }
-
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    router.push('/')
   }
 
   return (
@@ -145,7 +130,6 @@ export default function CameraPage() {
           <div className="flex gap-4">
             <Link href="/profile" className="text-sm hover:underline">Profile</Link>
             <Link href="/history" className="text-sm hover:underline">History</Link>
-            <button onClick={handleLogout} className="text-sm hover:underline">Logout</button>
           </div>
         </div>
       </div>

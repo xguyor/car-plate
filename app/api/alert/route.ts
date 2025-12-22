@@ -21,13 +21,6 @@ try {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
   try {
     const { plate, manualCorrection, confidence } = await request.json()
 
@@ -37,21 +30,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid plate format' }, { status: 400 })
     }
 
-    // Rate limiting: max 3 alerts per minute
-    const oneMinuteAgo = new Date(Date.now() - 60000).toISOString()
-    const { data: recentAlerts } = await supabase
-      .from('alerts')
-      .select('id')
-      .eq('sender_id', user.id)
-      .gte('created_at', oneMinuteAgo)
-
-    if (recentAlerts && recentAlerts.length >= 3) {
-      return NextResponse.json({
-        error: 'Rate limit: Max 3 alerts per minute'
-      }, { status: 429 })
-    }
-
-    // Find car owner by plate
+    // Find car owner by plate in Supabase
+    const supabase = await createServerSupabaseClient()
     const { data: owner, error: ownerError } = await supabase
       .from('users')
       .select('*')
@@ -64,25 +44,15 @@ export async function POST(request: Request) {
       }, { status: 404 })
     }
 
-    // Don't allow alerting yourself
-    if (owner.id === user.id) {
-      return NextResponse.json({
-        error: 'Cannot alert your own car'
-      }, { status: 400 })
-    }
-
     // Log the alert
-    const { error: insertError } = await supabase
+    await supabase
       .from('alerts')
       .insert({
-        sender_id: user.id,
         receiver_id: owner.id,
         detected_plate: plate,
         manual_correction: manualCorrection,
         ocr_confidence: confidence
       })
-
-    if (insertError) throw insertError
 
     // Send email notification
     if (resend) {

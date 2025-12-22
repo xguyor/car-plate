@@ -1,50 +1,24 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export default function ProfilePage() {
-  const supabase = createClient()
-  const router = useRouter()
-
   const [email, setEmail] = useState('')
   const [carPlate, setCarPlate] = useState('')
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
   useEffect(() => {
-    loadProfile()
+    // Load from localStorage
+    const savedEmail = localStorage.getItem('userEmail') || ''
+    const savedPlate = localStorage.getItem('userPlate') || ''
+    setEmail(savedEmail)
+    setCarPlate(savedPlate)
   }, [])
 
-  async function loadProfile() {
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      router.push('/')
-      return
-    }
-
-    setEmail(user.email || '')
-
-    // Get user profile from database
-    const { data: profile } = await supabase
-      .from('users')
-      .select('car_plate')
-      .eq('id', user.id)
-      .single()
-
-    if (profile) {
-      setCarPlate(profile.car_plate || '')
-    }
-
-    setLoading(false)
-  }
-
-  async function saveProfile() {
+  function saveProfile() {
     setSaving(true)
     setError('')
     setSuccess('')
@@ -57,28 +31,12 @@ export default function ProfilePage() {
       return
     }
 
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
+    // Save to localStorage
+    localStorage.setItem('userEmail', email)
+    localStorage.setItem('userPlate', carPlate)
 
-      const { error: upsertError } = await supabase
-        .from('users')
-        .upsert({
-          id: user.id,
-          email: user.email,
-          car_plate: carPlate || null,
-          updated_at: new Date().toISOString()
-        })
-
-      if (upsertError) throw upsertError
-
-      setSuccess('Profile saved!')
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to save'
-      setError(errorMessage)
-    } finally {
-      setSaving(false)
-    }
+    setSuccess('Profile saved!')
+    setSaving(false)
   }
 
   function formatPlate(value: string) {
@@ -99,14 +57,6 @@ export default function ProfilePage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <p>Loading...</p>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
@@ -119,13 +69,14 @@ export default function ProfilePage() {
       <div className="p-4 space-y-4">
         <div className="bg-white rounded-lg p-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Email
+            Your Email (for receiving alerts)
           </label>
           <input
             type="email"
             value={email}
-            disabled
-            className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-600"
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg"
           />
         </div>
 

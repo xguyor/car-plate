@@ -1,22 +1,23 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
 
 export async function POST(request: Request) {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
   try {
     const { image } = await request.json()
     const base64Data = image.split(',')[1]
 
+    if (!process.env.OCR_SPACE_API_KEY) {
+      return NextResponse.json({
+        plate: '',
+        confidence: 0,
+        rawText: '',
+        error: 'OCR not configured'
+      })
+    }
+
     // Call OCR.space API
     const formData = new FormData()
     formData.append('base64Image', `data:image/jpeg;base64,${base64Data}`)
-    formData.append('apikey', process.env.OCR_SPACE_API_KEY!)
+    formData.append('apikey', process.env.OCR_SPACE_API_KEY)
     formData.append('language', 'eng')
     formData.append('OCREngine', '2')
     formData.append('detectOrientation', 'true')
