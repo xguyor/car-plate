@@ -52,7 +52,7 @@ export async function GET(request: Request) {
     }
 
     // Get sent alerts (where user reported someone)
-    const { data: sent } = await supabase
+    const { data: sent, error: sentError } = await supabase
       .from('alerts')
       .select(`
         id,
@@ -64,6 +64,8 @@ export async function GET(request: Request) {
       .eq('sender_id', userId)
       .order('created_at', { ascending: false })
       .limit(50)
+
+    console.log('Sent alerts query - userId:', userId, 'count:', sent?.length, 'error:', sentError)
 
     const sentAlerts = (sent || []).map(alert => ({
       id: alert.id,

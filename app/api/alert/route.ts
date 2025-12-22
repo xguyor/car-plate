@@ -69,7 +69,8 @@ export async function POST(request: Request) {
     }
 
     // Log the alert
-    await supabase
+    console.log('Creating alert - senderId:', senderId, 'receiverId:', owner.id, 'plate:', plate)
+    const { error: alertError } = await supabase
       .from('alerts')
       .insert({
         sender_id: senderId || null,
@@ -78,6 +79,12 @@ export async function POST(request: Request) {
         manual_correction: manualCorrection,
         ocr_confidence: confidence
       })
+
+    if (alertError) {
+      console.error('Failed to create alert:', alertError)
+    } else {
+      console.log('Alert created successfully')
+    }
 
     // Send email notification
     if (resend && owner.email) {
