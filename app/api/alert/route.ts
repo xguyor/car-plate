@@ -29,7 +29,11 @@ try {
 
 export async function POST(request: Request) {
   try {
-    const { plate, manualCorrection, confidence, senderEmail, senderId } = await request.json()
+    const body = await request.json()
+    console.log('Alert request body:', JSON.stringify(body))
+
+    const { plate, manualCorrection, confidence, senderEmail, senderId } = body
+    console.log('Parsed senderId:', senderId, 'type:', typeof senderId)
 
     // Validate plate format (7 or 8 digits)
     const digitsOnly = plate.replace(/-/g, '')
@@ -127,23 +131,37 @@ export async function POST(request: Request) {
     // Send push notification
     console.log('Push check - webPushConfigured:', webPushConfigured)
     console.log('Push check - owner.push_subscription exists:', !!owner.push_subscription)
+    console.log('Push check - VAPID_PRIVATE_KEY set:', !!VAPID_PRIVATE_KEY)
 
     if (owner.push_subscription && webPushConfigured) {
       try {
-        console.log('Sending push to subscription:', JSON.stringify(owner.push_subscription).substring(0, 100))
-        await webpush.sendNotification(
-          owner.push_subscription,
-          JSON.stringify({
-            title: 'Someone is blocking your car!',
-            body: `${senderName} parked behind you. Contact them when you need to leave.`,
-            icon: '/icon-192.png',
-            badge: '/icon-192.png',
-            data: { url: '/history' }
-          })
-        )
-        console.log('Push notification sent successfully')
-      } catch (pushError) {
+        const subscriptionForPush = owner.push_subscription
+        console.log('Push subscription endpoint:', subscriptionForPush.endpoint)
+        console.log('Push subscription keys present:', !!subscriptionForPush.keys)
+
+        const pushPayload = JSON.stringify({
+          title: 'Someone is blocking your car!',
+          body: `${senderName} parked behind you. Contact them when you need to leave.`,
+          icon: '/icon-192.png',
+          badge: '/icon-192.png',
+          data: { url: '/history' }
+        })
+        console.log('Push payload:', pushPayload)
+
+        const result = await webpush.sendNotification(subscriptionForPush, pushPayload)
+        console.log('Push notification result:', result.statusCode, result.body)
+      } catch (pushError: unknown) {
         console.error('Push notification failed:', pushError)
+        if (pushError instanceof Error) {
+          console.error('Push error message:', pushError.message)
+          console.error('Push error stack:', pushError.stack)
+        }
+        // Check if it's a WebPushError with more details
+        const webPushError = pushError as { statusCode?: number; body?: string; headers?: Record<string, string> }
+        if (webPushError.statusCode) {
+          console.error('Push error status:', webPushError.statusCode)
+          console.error('Push error body:', webPushError.body)
+        }
       }
     } else {
       console.log('Push notification skipped - no subscription or not configured')

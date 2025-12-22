@@ -18,17 +18,18 @@ export async function GET() {
       .select('*')
       .limit(20)
 
-    // Check table info
-    const { data: tableInfo } = await supabase
-      .from('information_schema.tables')
-      .select('table_name')
-      .eq('table_schema', 'public')
+    // Build a map of user IDs to names for lookup
+    const userMap = new Map<string, string>()
+    users?.forEach(u => userMap.set(u.id, u.name || u.email || u.id))
 
     return NextResponse.json({
-      tables: tableInfo?.map(t => t.table_name) || [],
       alertsError: alertsError?.message || null,
       alertsCount: alerts?.length || 0,
-      recentAlerts: alerts || [],
+      recentAlerts: alerts?.map(a => ({
+        ...a,
+        sender_name: a.sender_id ? userMap.get(a.sender_id) || 'Unknown' : 'NO SENDER',
+        receiver_name: a.receiver_id ? userMap.get(a.receiver_id) || 'Unknown' : 'NO RECEIVER'
+      })) || [],
       usersError: usersError?.message || null,
       usersCount: users?.length || 0,
       users: users?.map(u => ({
@@ -38,7 +39,7 @@ export async function GET() {
         phone: u.phone,
         car_plate: u.car_plate,
         has_push: !!u.push_subscription,
-        push_endpoint: u.push_subscription?.endpoint?.substring(0, 50) || null
+        push_endpoint: u.push_subscription?.endpoint?.substring(0, 80) || null
       })) || []
     })
 

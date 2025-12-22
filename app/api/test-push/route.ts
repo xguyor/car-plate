@@ -2,19 +2,26 @@ import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import webpush from 'web-push'
 
+// Use hardcoded VAPID public key for reliability
+const VAPID_PUBLIC_KEY = 'BEXb7h-x0dmbvwN2TAwg9jWAONGrRZ0Z9qWp4bkRu625o_J43QTYXkhnNHLnt_-iL4ms-5iNf-MVC77OMPwgAUI'
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY?.trim() || ''
+
 // Configure VAPID for Web Push
 let webPushConfigured = false
 try {
-  if (process.env.VAPID_PRIVATE_KEY && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+  if (VAPID_PRIVATE_KEY) {
     webpush.setVapidDetails(
       'mailto:alerts@carblock.app',
-      process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-      process.env.VAPID_PRIVATE_KEY
+      VAPID_PUBLIC_KEY,
+      VAPID_PRIVATE_KEY
     )
     webPushConfigured = true
+    console.log('Test-push: Web push configured successfully')
+  } else {
+    console.warn('Test-push: VAPID_PRIVATE_KEY not set')
   }
 } catch (e) {
-  console.warn('Web push not configured:', e)
+  console.warn('Test-push: Web push not configured:', e)
 }
 
 export async function POST(request: Request) {
@@ -58,8 +65,7 @@ export async function POST(request: Request) {
         error: 'Web push not configured on server',
         debug: {
           webPushConfigured,
-          hasVapidPublic: !!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-          hasVapidPrivate: !!process.env.VAPID_PRIVATE_KEY
+          hasVapidPrivate: !!VAPID_PRIVATE_KEY
         }
       }, { status: 500 })
     }
