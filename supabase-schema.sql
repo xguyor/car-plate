@@ -18,6 +18,7 @@ CREATE TABLE users (
 );
 
 -- Alerts table (audit log)
+-- Status values: 'active' (blocking), 'leaving_soon' (blocked person wants to leave), 'resolved' (blocker left)
 CREATE TABLE alerts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sender_id UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -25,7 +26,9 @@ CREATE TABLE alerts (
   detected_plate TEXT NOT NULL,
   manual_correction BOOLEAN DEFAULT FALSE,
   ocr_confidence FLOAT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'leaving_soon', 'resolved')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Indexes for performance

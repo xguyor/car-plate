@@ -29,6 +29,7 @@ export async function GET(request: Request) {
           id,
           detected_plate,
           created_at,
+          status,
           sender:sender_id(name, phone)
         `)
         .eq('detected_plate', user.car_plate)
@@ -41,6 +42,7 @@ export async function GET(request: Request) {
             id: alert.id,
             detected_plate: alert.detected_plate,
             created_at: alert.created_at,
+            status: alert.status || 'active',
             sender_name: (alert.sender as { name?: string } | null)?.name,
             sender_phone: (alert.sender as { phone?: string } | null)?.phone,
             type: 'received' as const
@@ -55,7 +57,9 @@ export async function GET(request: Request) {
       .select(`
         id,
         detected_plate,
-        created_at
+        created_at,
+        status,
+        receiver:receiver_id(name, phone)
       `)
       .eq('sender_id', userId)
       .order('created_at', { ascending: false })
@@ -65,6 +69,9 @@ export async function GET(request: Request) {
       id: alert.id,
       detected_plate: alert.detected_plate,
       created_at: alert.created_at,
+      status: alert.status || 'active',
+      receiver_name: (alert.receiver as { name?: string } | null)?.name,
+      receiver_phone: (alert.receiver as { phone?: string } | null)?.phone,
       type: 'sent' as const
     }))
 

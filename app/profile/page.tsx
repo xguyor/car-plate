@@ -3,12 +3,17 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
+type ViewMode = 'login' | 'register' | 'edit'
+
 export default function ProfilePage() {
+  const [viewMode, setViewMode] = useState<ViewMode>('login')
+  const [loginPhone, setLoginPhone] = useState('')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [carPlate, setCarPlate] = useState('')
   const [saving, setSaving] = useState(false)
+  const [checking, setChecking] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
@@ -17,15 +22,19 @@ export default function ProfilePage() {
   const [showIOSInstall, setShowIOSInstall] = useState(false)
 
   useEffect(() => {
-    // Ensure we're in the browser
     if (typeof window === 'undefined') return
 
     try {
-      // Load from localStorage
-      setName(localStorage.getItem('userName') || '')
-      setEmail(localStorage.getItem('userEmail') || '')
-      setPhone(localStorage.getItem('userPhone') || '')
-      setCarPlate(localStorage.getItem('userPlate') || '')
+      // Check if user is already logged in
+      const userId = localStorage.getItem('userId')
+      if (userId) {
+        // Load existing profile data
+        setName(localStorage.getItem('userName') || '')
+        setEmail(localStorage.getItem('userEmail') || '')
+        setPhone(localStorage.getItem('userPhone') || '')
+        setCarPlate(localStorage.getItem('userPlate') || '')
+        setViewMode('edit')
+      }
 
       // Check notification permission
       if ('Notification' in window) {
@@ -48,7 +57,6 @@ export default function ProfilePage() {
     }
   }, [])
 
-  // Convert base64 VAPID key to Uint8Array
   function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
     const padding = '='.repeat((4 - base64String.length % 4) % 4)
     const base64 = (base64String + padding)
@@ -69,81 +77,100 @@ export default function ProfilePage() {
     }
 
     try {
-      // Fetch VAPID key from API with cache busting
       console.log('Fetching VAPID key from API...')
-      let vapidResponse
-      try {
-        vapidResponse = await fetch('/api/vapid-key', {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache' }
-        })
-        console.log('VAPID API response status:', vapidResponse.status)
-      } catch (fetchErr) {
-        console.error('Fetch failed:', fetchErr)
-        setError(`Network error fetching VAPID key: ${fetchErr instanceof Error ? fetchErr.message : 'Unknown'}`)
-        return null
-      }
+      const vapidResponse = await fetch('/api/vapid-key', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      })
 
       if (!vapidResponse.ok) {
         setError(`VAPID API error: ${vapidResponse.status}`)
         return null
       }
 
-      let vapidData
-      try {
-        vapidData = await vapidResponse.json()
-        console.log('VAPID API response:', JSON.stringify(vapidData))
-      } catch (jsonErr) {
-        console.error('JSON parse failed:', jsonErr)
-        setError('Failed to parse VAPID response')
-        return null
-      }
-
+      const vapidData = await vapidResponse.json()
       if (!vapidData.vapidPublicKey) {
-        setError(`VAPID key missing. Response: ${JSON.stringify(vapidData)}`)
-        console.error('VAPID key not available:', vapidData)
+        setError('VAPID key missing')
         return null
       }
 
       const vapidPublicKey = vapidData.vapidPublicKey.trim()
-      console.log('Got VAPID key:', vapidPublicKey.substring(0, 20) + '...')
 
       const permission = await Notification.requestPermission()
-      console.log('Notification permission:', permission)
-
       if (permission !== 'granted') {
         setError('Please allow notifications to receive alerts')
         return null
       }
 
-      // Register service worker and get push subscription
-      console.log('Registering service worker...')
       const registration = await navigator.serviceWorker.register('/sw.js')
-      console.log('Service worker registered, waiting for ready...')
       await navigator.serviceWorker.ready
-      console.log('Service worker ready')
 
-      console.log('Subscribing to push...')
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
       })
-      console.log('Push subscription created!')
 
-      // Save subscription to localStorage - use toJSON() for proper serialization
       const subscriptionJson = subscription.toJSON()
       localStorage.setItem('pushSubscription', JSON.stringify(subscriptionJson))
-      console.log('Push subscription saved to localStorage:', subscriptionJson.endpoint?.substring(0, 50))
 
       setNotificationsEnabled(true)
       return subscription
     } catch (err) {
       console.error('Notification error:', err)
       const errorMsg = err instanceof Error ? err.message : 'Unknown error'
-      // Show alert for easier debugging on mobile
       alert(`Push error: ${errorMsg}`)
       setError(`Failed to enable notifications: ${errorMsg}`)
       return null
+    }
+  }
+
+  async function handleLogin() {
+    if (!loginPhone) {
+      setError('Please enter your phone number')
+      return
+    }
+
+    setChecking(true)
+    setError('')
+
+    try {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: loginPhone })
+      })
+
+      const data = await response.json()
+
+      if (data.error) {
+        setError(data.error)
+        return
+      }
+
+      if (data.found) {
+        // User exists - log them in
+        localStorage.setItem('userId', data.user.id)
+        localStorage.setItem('userName', data.user.name || '')
+        localStorage.setItem('userEmail', data.user.email || '')
+        localStorage.setItem('userPhone', data.user.phone || '')
+        localStorage.setItem('userPlate', data.user.carPlate || '')
+
+        setName(data.user.name || '')
+        setEmail(data.user.email || '')
+        setPhone(data.user.phone || '')
+        setCarPlate(data.user.carPlate || '')
+        setSuccess('Welcome back!')
+        setViewMode('edit')
+      } else {
+        // User not found - show registration
+        setPhone(loginPhone)
+        setViewMode('register')
+      }
+    } catch (err) {
+      console.error('Login error:', err)
+      setError('Failed to check phone number')
+    } finally {
+      setChecking(false)
     }
   }
 
@@ -158,6 +185,12 @@ export default function ProfilePage() {
       return
     }
 
+    if (!phone) {
+      setError('Phone number is required')
+      setSaving(false)
+      return
+    }
+
     const digitsOnly = carPlate.replace(/-/g, '')
     if (carPlate && (digitsOnly.length < 7 || digitsOnly.length > 8)) {
       setError('Plate must be 7 or 8 digits')
@@ -166,13 +199,9 @@ export default function ProfilePage() {
     }
 
     try {
-      // Get existing subscription or try to get a new one if notifications enabled
       let pushSubscription = localStorage.getItem('pushSubscription')
-      console.log('Save profile - existing pushSubscription in localStorage:', !!pushSubscription)
 
-      // If notifications are enabled but no subscription, get one
       if (notificationsEnabled && !pushSubscription) {
-        console.log('Notifications enabled but no subscription, getting one...')
         const subscription = await enableNotifications()
         if (subscription) {
           pushSubscription = JSON.stringify(subscription.toJSON())
@@ -180,9 +209,6 @@ export default function ProfilePage() {
       }
 
       const parsedSubscription = pushSubscription ? JSON.parse(pushSubscription) : null
-      console.log('Sending to API - pushSubscription:', parsedSubscription ? 'yes' : 'no')
-
-      // Get existing userId from localStorage to verify ownership
       const existingUserId = localStorage.getItem('userId')
 
       const response = await fetch('/api/profile', {
@@ -216,12 +242,29 @@ export default function ProfilePage() {
       }
 
       setSuccess('Profile saved!')
+      setViewMode('edit')
     } catch (err) {
       console.error('Save error:', err)
       setError(err instanceof Error ? err.message : 'Failed to save. Please try again.')
     } finally {
       setSaving(false)
     }
+  }
+
+  function logout() {
+    localStorage.removeItem('userId')
+    localStorage.removeItem('userName')
+    localStorage.removeItem('userEmail')
+    localStorage.removeItem('userPhone')
+    localStorage.removeItem('userPlate')
+    localStorage.removeItem('pushSubscription')
+    setName('')
+    setEmail('')
+    setPhone('')
+    setCarPlate('')
+    setLoginPhone('')
+    setViewMode('login')
+    setSuccess('')
   }
 
   function formatPlate(value: string) {
@@ -244,164 +287,338 @@ export default function ProfilePage() {
     return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 10)}`
   }
 
+  // Login view
+  if (viewMode === 'login') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-purple-900 to-purple-950">
+        <div className="bg-purple-800/50 backdrop-blur-sm text-white p-4 sticky top-0 z-10">
+          <div className="flex items-center gap-4">
+            <Link href="/camera" className="text-purple-200 hover:text-white">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </Link>
+            <h1 className="text-xl font-bold">Login</h1>
+          </div>
+        </div>
+
+        <div className="p-4 space-y-4 max-w-md mx-auto">
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/30">
+            <div className="text-center mb-6">
+              <svg className="w-16 h-16 mx-auto mb-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+              </svg>
+              <h2 className="text-white text-xl font-bold mb-2">Welcome to CarBlock</h2>
+              <p className="text-purple-300 text-sm">Enter your phone number to login or register</p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-purple-200 mb-2">
+                Phone Number
+              </label>
+              <input
+                type="tel"
+                value={loginPhone}
+                onChange={(e) => setLoginPhone(formatPhone(e.target.value))}
+                placeholder="050-123-4567"
+                className="w-full px-4 py-3 bg-purple-900/50 border border-purple-500/30 rounded-xl text-white text-center text-xl placeholder-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+              />
+            </div>
+
+            {error && (
+              <div className="bg-red-500/20 border border-red-500/30 text-red-300 p-3 rounded-xl text-center text-sm mb-4">
+                {error}
+              </div>
+            )}
+
+            <button
+              onClick={handleLogin}
+              disabled={checking || !loginPhone}
+              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50 shadow-lg shadow-purple-500/30"
+            >
+              {checking ? 'Checking...' : 'Continue'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Register view
+  if (viewMode === 'register') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-purple-900 to-purple-950">
+        <div className="bg-purple-800/50 backdrop-blur-sm text-white p-4 sticky top-0 z-10">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setViewMode('login')} className="text-purple-200 hover:text-white">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <h1 className="text-xl font-bold">Register</h1>
+          </div>
+        </div>
+
+        <div className="p-4 space-y-4 max-w-md mx-auto">
+          <div className="bg-blue-500/20 border border-blue-500/30 rounded-xl p-4 mb-4">
+            <p className="text-blue-200 text-sm text-center">
+              Phone number not found. Please complete your registration below.
+            </p>
+          </div>
+
+          <ProfileForm
+            name={name}
+            setName={setName}
+            email={email}
+            setEmail={setEmail}
+            phone={phone}
+            setPhone={(v) => setPhone(formatPhone(v))}
+            carPlate={carPlate}
+            setCarPlate={(v) => setCarPlate(formatPlate(v))}
+            notificationsEnabled={notificationsEnabled}
+            enableNotifications={async () => {
+              const sub = await enableNotifications()
+              if (sub) setSuccess('Notifications enabled!')
+            }}
+            isIOS={isIOS}
+            isStandalone={isStandalone}
+            showIOSInstall={showIOSInstall}
+            setShowIOSInstall={setShowIOSInstall}
+            error={error}
+            success={success}
+            saving={saving}
+            onSave={saveProfile}
+            buttonText="Create Account"
+          />
+        </div>
+      </div>
+    )
+  }
+
+  // Edit profile view
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-900 to-purple-950">
-      {/* Header */}
       <div className="bg-purple-800/50 backdrop-blur-sm text-white p-4 sticky top-0 z-10">
-        <div className="flex items-center gap-4">
-          <Link href="/camera" className="text-purple-200 hover:text-white">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </Link>
-          <h1 className="text-xl font-bold">My Profile</h1>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/camera" className="text-purple-200 hover:text-white">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </Link>
+            <h1 className="text-xl font-bold">My Profile</h1>
+          </div>
+          <button
+            onClick={logout}
+            className="text-purple-300 hover:text-white text-sm"
+          >
+            Logout
+          </button>
         </div>
       </div>
 
-      {/* Form */}
       <div className="p-4 space-y-4 max-w-md mx-auto">
-        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-purple-500/30">
-          <label className="block text-sm font-medium text-purple-200 mb-2">
-            Your Name
-          </label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="John Doe"
-            className="w-full px-4 py-3 bg-purple-900/50 border border-purple-500/30 rounded-xl text-white placeholder-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
-          />
-        </div>
-
-        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-purple-500/30">
-          <label className="block text-sm font-medium text-purple-200 mb-2">
-            Email (for alerts)
-          </label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            className="w-full px-4 py-3 bg-purple-900/50 border border-purple-500/30 rounded-xl text-white placeholder-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
-          />
-        </div>
-
-        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-purple-500/30">
-          <label className="block text-sm font-medium text-purple-200 mb-2">
-            Phone Number (so others can call you)
-          </label>
-          <input
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(formatPhone(e.target.value))}
-            placeholder="050-123-4567"
-            className="w-full px-4 py-3 bg-purple-900/50 border border-purple-500/30 rounded-xl text-white placeholder-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
-          />
-        </div>
-
-        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-purple-500/30">
-          <label className="block text-sm font-medium text-purple-200 mb-2">
-            Car Plate Number
-          </label>
-          <input
-            type="text"
-            value={carPlate}
-            onChange={(e) => setCarPlate(formatPlate(e.target.value))}
-            placeholder="1234567"
-            maxLength={11}
-            className="w-full px-4 py-3 bg-purple-900/50 border border-purple-500/30 rounded-xl text-white text-center text-2xl font-mono placeholder-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
-          />
-          <p className="text-sm text-purple-300 mt-2 text-center">
-            Register to receive alerts when blocking
-          </p>
-        </div>
-
-        {/* Push Notifications */}
-        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-purple-500/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-white font-medium">Push Notifications</p>
-              <p className="text-sm text-purple-300">Get instant alerts on your phone</p>
-            </div>
-            {isIOS && !isStandalone ? (
-              <span className="px-3 py-1 bg-yellow-500/20 text-yellow-300 text-sm rounded-lg">
-                Install app first
-              </span>
-            ) : (
-              <button
-                onClick={async () => {
-                  const subscription = await enableNotifications()
-                  if (subscription) {
-                    setSuccess('Notifications enabled! Save your profile to activate.')
-                  }
-                }}
-                disabled={notificationsEnabled}
-                className={`px-4 py-2 rounded-xl font-medium ${
-                  notificationsEnabled
-                    ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                    : 'bg-purple-500 text-white hover:bg-purple-400'
-                }`}
-              >
-                {notificationsEnabled ? 'Enabled' : 'Enable'}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* iOS Install Instructions */}
-        {showIOSInstall && (
-          <div className="bg-blue-500/20 border border-blue-500/30 rounded-2xl p-4">
-            <div className="flex justify-between items-start mb-3">
-              <p className="text-white font-medium">Install CarBlock App</p>
-              <button
-                onClick={() => setShowIOSInstall(false)}
-                className="text-blue-300 hover:text-white"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <p className="text-blue-200 text-sm mb-3">
-              To receive push notifications on iPhone, install this app to your home screen:
-            </p>
-            <ol className="text-blue-200 text-sm space-y-2">
-              <li className="flex items-start gap-2">
-                <span className="bg-blue-500/30 rounded-full w-5 h-5 flex items-center justify-center text-xs shrink-0">1</span>
-                <span>Tap the <strong>Share</strong> button <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg> at the bottom of Safari</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="bg-blue-500/30 rounded-full w-5 h-5 flex items-center justify-center text-xs shrink-0">2</span>
-                <span>Scroll down and tap <strong>&quot;Add to Home Screen&quot;</strong></span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="bg-blue-500/30 rounded-full w-5 h-5 flex items-center justify-center text-xs shrink-0">3</span>
-                <span>Open the app from your home screen, then enable notifications</span>
-              </li>
-            </ol>
-          </div>
-        )}
-
-        {error && (
-          <div className="bg-red-500/20 border border-red-500/30 text-red-300 p-4 rounded-xl text-center">
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="bg-green-500/20 border border-green-500/30 text-green-300 p-4 rounded-xl text-center">
-            {success}
-          </div>
-        )}
-
-        <button
-          onClick={saveProfile}
-          disabled={saving}
-          className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all"
-        >
-          {saving ? 'Saving...' : 'Save Profile'}
-        </button>
+        <ProfileForm
+          name={name}
+          setName={setName}
+          email={email}
+          setEmail={setEmail}
+          phone={phone}
+          setPhone={(v) => setPhone(formatPhone(v))}
+          carPlate={carPlate}
+          setCarPlate={(v) => setCarPlate(formatPlate(v))}
+          notificationsEnabled={notificationsEnabled}
+          enableNotifications={async () => {
+            const sub = await enableNotifications()
+            if (sub) setSuccess('Notifications enabled!')
+          }}
+          isIOS={isIOS}
+          isStandalone={isStandalone}
+          showIOSInstall={showIOSInstall}
+          setShowIOSInstall={setShowIOSInstall}
+          error={error}
+          success={success}
+          saving={saving}
+          onSave={saveProfile}
+          buttonText="Save Profile"
+        />
       </div>
     </div>
+  )
+}
+
+interface ProfileFormProps {
+  name: string
+  setName: (v: string) => void
+  email: string
+  setEmail: (v: string) => void
+  phone: string
+  setPhone: (v: string) => void
+  carPlate: string
+  setCarPlate: (v: string) => void
+  notificationsEnabled: boolean
+  enableNotifications: () => Promise<void>
+  isIOS: boolean
+  isStandalone: boolean
+  showIOSInstall: boolean
+  setShowIOSInstall: (v: boolean) => void
+  error: string
+  success: string
+  saving: boolean
+  onSave: () => void
+  buttonText: string
+}
+
+function ProfileForm({
+  name, setName,
+  email, setEmail,
+  phone, setPhone,
+  carPlate, setCarPlate,
+  notificationsEnabled, enableNotifications,
+  isIOS, isStandalone,
+  showIOSInstall, setShowIOSInstall,
+  error, success,
+  saving, onSave,
+  buttonText
+}: ProfileFormProps) {
+  return (
+    <>
+      <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-purple-500/30">
+        <label className="block text-sm font-medium text-purple-200 mb-2">
+          Your Name
+        </label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="John Doe"
+          className="w-full px-4 py-3 bg-purple-900/50 border border-purple-500/30 rounded-xl text-white placeholder-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+        />
+      </div>
+
+      <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-purple-500/30">
+        <label className="block text-sm font-medium text-purple-200 mb-2">
+          Email (for alerts)
+        </label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          className="w-full px-4 py-3 bg-purple-900/50 border border-purple-500/30 rounded-xl text-white placeholder-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+        />
+      </div>
+
+      <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-purple-500/30">
+        <label className="block text-sm font-medium text-purple-200 mb-2">
+          Phone Number (for login & contact)
+        </label>
+        <input
+          type="tel"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="050-123-4567"
+          className="w-full px-4 py-3 bg-purple-900/50 border border-purple-500/30 rounded-xl text-white placeholder-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+        />
+      </div>
+
+      <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-purple-500/30">
+        <label className="block text-sm font-medium text-purple-200 mb-2">
+          Car Plate Number
+        </label>
+        <input
+          type="text"
+          value={carPlate}
+          onChange={(e) => setCarPlate(e.target.value)}
+          placeholder="1234567"
+          maxLength={11}
+          className="w-full px-4 py-3 bg-purple-900/50 border border-purple-500/30 rounded-xl text-white text-center text-2xl font-mono placeholder-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+        />
+        <p className="text-sm text-purple-300 mt-2 text-center">
+          Register to receive alerts when someone blocks you
+        </p>
+      </div>
+
+      {/* Push Notifications */}
+      <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-purple-500/30">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-white font-medium">Push Notifications</p>
+            <p className="text-sm text-purple-300">Get instant alerts on your phone</p>
+          </div>
+          {isIOS && !isStandalone ? (
+            <span className="px-3 py-1 bg-yellow-500/20 text-yellow-300 text-sm rounded-lg">
+              Install app first
+            </span>
+          ) : (
+            <button
+              onClick={enableNotifications}
+              disabled={notificationsEnabled}
+              className={`px-4 py-2 rounded-xl font-medium ${
+                notificationsEnabled
+                  ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                  : 'bg-purple-500 text-white hover:bg-purple-400'
+              }`}
+            >
+              {notificationsEnabled ? 'Enabled' : 'Enable'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* iOS Install Instructions */}
+      {showIOSInstall && (
+        <div className="bg-blue-500/20 border border-blue-500/30 rounded-2xl p-4">
+          <div className="flex justify-between items-start mb-3">
+            <p className="text-white font-medium">Install CarBlock App</p>
+            <button
+              onClick={() => setShowIOSInstall(false)}
+              className="text-blue-300 hover:text-white"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <p className="text-blue-200 text-sm mb-3">
+            To receive push notifications on iPhone, install this app to your home screen:
+          </p>
+          <ol className="text-blue-200 text-sm space-y-2">
+            <li className="flex items-start gap-2">
+              <span className="bg-blue-500/30 rounded-full w-5 h-5 flex items-center justify-center text-xs shrink-0">1</span>
+              <span>Tap the <strong>Share</strong> button at the bottom of Safari</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="bg-blue-500/30 rounded-full w-5 h-5 flex items-center justify-center text-xs shrink-0">2</span>
+              <span>Scroll down and tap <strong>&quot;Add to Home Screen&quot;</strong></span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="bg-blue-500/30 rounded-full w-5 h-5 flex items-center justify-center text-xs shrink-0">3</span>
+              <span>Open the app from your home screen, then enable notifications</span>
+            </li>
+          </ol>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-500/20 border border-red-500/30 text-red-300 p-4 rounded-xl text-center">
+          {error}
+        </div>
+      )}
+
+      {success && (
+        <div className="bg-green-500/20 border border-green-500/30 text-green-300 p-4 rounded-xl text-center">
+          {success}
+        </div>
+      )}
+
+      <button
+        onClick={onSave}
+        disabled={saving}
+        className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all"
+      >
+        {saving ? 'Saving...' : buttonText}
+      </button>
+    </>
   )
 }

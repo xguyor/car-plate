@@ -5,9 +5,14 @@ export async function POST(request: Request) {
   try {
     const { name, email, phone, carPlate, pushSubscription, existingUserId } = await request.json()
 
+    console.log('Profile save - phone:', phone)
     console.log('Profile save - email:', email)
     console.log('Profile save - existingUserId:', existingUserId)
     console.log('Profile save - pushSubscription received:', !!pushSubscription)
+
+    if (!phone) {
+      return NextResponse.json({ error: 'Phone number is required' }, { status: 400 })
+    }
 
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
@@ -15,65 +20,83 @@ export async function POST(request: Request) {
 
     const supabase = await createServerSupabaseClient()
 
-    // Check if user exists by email
-    const { data: existingUserByEmail } = await supabase
+    // First, check if user exists by existingUserId (they're editing their profile)
+    let existingUser = null
+    if (existingUserId) {
+      const { data: userById } = await supabase
+        .from('users')
+        .select('id, phone, email, car_plate')
+        .eq('id', existingUserId)
+        .single()
+      existingUser = userById
+    }
+
+    // If no existingUserId, check by phone (new registration or re-login)
+    if (!existingUser) {
+      const { data: userByPhone } = await supabase
+        .from('users')
+        .select('id, phone, email, car_plate')
+        .eq('phone', phone)
+        .single()
+      existingUser = userByPhone
+    }
+
+    // Check if email is already registered to someone else
+    const { data: emailUser } = await supabase
       .from('users')
       .select('id')
       .eq('email', email)
       .single()
 
+    if (emailUser && (!existingUser || emailUser.id !== existingUser.id)) {
+      return NextResponse.json({
+        error: 'This email is already registered to another user'
+      }, { status: 409 })
+    }
+
+    // Check if phone is already registered to someone else
+    const { data: phoneUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('phone', phone)
+      .single()
+
+    if (phoneUser && (!existingUser || phoneUser.id !== existingUser.id)) {
+      return NextResponse.json({
+        error: 'This phone number is already registered to another user'
+      }, { status: 409 })
+    }
+
     // Check if car plate is already registered to someone else
     if (carPlate) {
-      const { data: existingPlateUser } = await supabase
+      const { data: plateUser } = await supabase
         .from('users')
-        .select('id, email')
+        .select('id')
         .eq('car_plate', carPlate)
         .single()
 
-      if (existingPlateUser && existingPlateUser.email !== email) {
+      if (plateUser && (!existingUser || plateUser.id !== existingUser.id)) {
         return NextResponse.json({
           error: 'This car plate is already registered to another user'
         }, { status: 409 })
       }
     }
 
-    // Check if phone is already registered to someone else
-    if (phone) {
-      const { data: existingPhoneUser } = await supabase
-        .from('users')
-        .select('id, email')
-        .eq('phone', phone)
-        .single()
+    let userId = existingUser?.id
 
-      if (existingPhoneUser && existingPhoneUser.email !== email) {
-        return NextResponse.json({
-          error: 'This phone number is already registered to another user'
-        }, { status: 409 })
-      }
-    }
-
-    let userId = existingUserByEmail?.id
-
-    if (existingUserByEmail) {
-      // User exists - check if this is the same user updating their profile
-      // Allow update only if they have the userId in localStorage (they own this account)
-      if (existingUserId && existingUserId !== existingUserByEmail.id) {
-        return NextResponse.json({
-          error: 'This email is already registered to another account'
-        }, { status: 409 })
-      }
-
+    if (existingUser) {
       // Update existing user
       const { error: updateError } = await supabase
         .from('users')
         .update({
           name: name || null,
-          phone: phone || null,
+          email: email,
+          phone: phone,
           car_plate: carPlate || null,
           push_subscription: pushSubscription || null,
           updated_at: new Date().toISOString()
         })
-        .eq('email', email)
+        .eq('id', existingUser.id)
 
       if (updateError) throw updateError
     } else {
@@ -85,7 +108,7 @@ export async function POST(request: Request) {
           id: userId,
           name: name || null,
           email: email,
-          phone: phone || null,
+          phone: phone,
           car_plate: carPlate || null,
           push_subscription: pushSubscription || null
         })
