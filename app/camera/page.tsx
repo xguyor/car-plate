@@ -26,6 +26,7 @@ export default function CameraPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const [hasCamera, setHasCamera] = useState(false)
+  const [cameraStarted, setCameraStarted] = useState(false)
   const [plate, setPlate] = useState('')
   const [confidence, setConfidence] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -130,15 +131,26 @@ export default function CameraPage() {
   }, [loadActiveAlerts])
 
   async function startCamera() {
-    try {
-      // Check if we already have permission
-      const permissionStatus = await navigator.permissions?.query({ name: 'camera' as PermissionName }).catch(() => null)
+    // Prevent multiple camera starts
+    if (cameraStarted) return
+    setCameraStarted(true)
 
-      // If permission was denied, don't keep asking
-      if (permissionStatus?.state === 'denied') {
-        console.log('Camera permission denied')
+    try {
+      // Check if camera was previously denied (stored in localStorage)
+      const cameraDenied = localStorage.getItem('cameraDenied')
+      if (cameraDenied === 'true') {
+        console.log('Camera was previously denied')
         setHasCamera(false)
         return
+      }
+
+      // Check if we already have an active stream
+      if (videoRef.current?.srcObject) {
+        const existingStream = videoRef.current.srcObject as MediaStream
+        if (existingStream.active) {
+          setHasCamera(true)
+          return
+        }
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -147,10 +159,15 @@ export default function CameraPage() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         setHasCamera(true)
+        localStorage.setItem('cameraDenied', 'false')
       }
     } catch (err) {
       console.log('Camera error:', err)
       setHasCamera(false)
+      // Store that camera was denied so we don't ask again
+      if (err instanceof Error && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
+        localStorage.setItem('cameraDenied', 'true')
+      }
     }
   }
 
@@ -265,11 +282,7 @@ export default function CameraPage() {
       <div className="bg-purple-800/50 backdrop-blur-sm text-white p-4 sticky top-0 z-10">
         <div className="flex justify-between items-center max-w-md mx-auto">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-            </div>
+            <img src="/logo.png" alt="CarBlock" className="w-10 h-10 rounded-xl" />
             <div>
               <h1 className="text-lg font-bold">CarBlock</h1>
               <p className="text-xs text-purple-300">by Forsight Robotics</p>
