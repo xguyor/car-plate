@@ -352,10 +352,28 @@ export default function CameraPage() {
               )}
 
               {alert.status === 'leaving_soon' && (
-                <div className="bg-orange-500/20 text-orange-300 py-3 px-4 rounded-xl text-center font-medium">
+                <div className="bg-orange-500/20 text-orange-300 py-3 px-4 rounded-xl text-center font-medium mb-3">
                   Waiting for blocker to move...
                 </div>
               )}
+
+              {/* Dismiss button - always show for received alerts */}
+              <button
+                onClick={() => updateAlertStatus(alert.id, 'resolved')}
+                disabled={updatingAlertId === alert.id}
+                className="w-full bg-gray-600 hover:bg-gray-500 text-white py-2 px-4 rounded-xl text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
+              >
+                {updatingAlertId === alert.id ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Dismiss (They Left)
+                  </>
+                )}
+              </button>
             </div>
           ))}
 
