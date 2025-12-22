@@ -8,8 +8,6 @@ export default function Home() {
   const supabase = createClient()
   const router = useRouter()
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [isSignUp, setIsSignUp] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -30,24 +28,14 @@ export default function Home() {
     setMessage('')
 
     try {
-      if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`
-          }
-        })
-        if (error) throw error
-        setMessage('Check your email for a confirmation link!')
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        })
-        if (error) throw error
-        router.push('/camera')
-      }
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`
+        }
+      })
+      if (error) throw error
+      setMessage('Check your email for a login link!')
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred'
       setError(errorMessage)
@@ -65,7 +53,7 @@ export default function Home() {
 
       <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
         <h2 className="text-xl font-semibold text-gray-800 mb-6 text-center">
-          {isSignUp ? 'Create Account' : 'Sign In'}
+          Sign In
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -80,21 +68,6 @@ export default function Home() {
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="you@example.com"
               required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="••••••••"
-              required
-              minLength={6}
             />
           </div>
 
@@ -115,22 +88,13 @@ export default function Home() {
             disabled={loading}
             className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
+            {loading ? 'Sending...' : 'Send Magic Link'}
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => {
-              setIsSignUp(!isSignUp)
-              setError('')
-              setMessage('')
-            }}
-            className="text-blue-600 hover:underline"
-          >
-            {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-          </button>
-        </div>
+        <p className="text-gray-500 text-sm mt-4 text-center">
+          We&apos;ll send you an email with a link to sign in
+        </p>
       </div>
 
       <p className="text-blue-200 text-sm mt-8 text-center max-w-md">
