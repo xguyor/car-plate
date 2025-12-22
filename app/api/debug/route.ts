@@ -1,49 +1,35 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
-
     const supabase = await createServerSupabaseClient()
 
-    // Get user info
-    let userInfo = null
-    if (userId) {
-      const { data: user } = await supabase
-        .from('users')
-        .select('id, name, email, phone, car_plate, push_subscription')
-        .eq('id', userId)
-        .single()
-      userInfo = user ? {
-        ...user,
-        has_push_subscription: !!user.push_subscription
-      } : null
-    }
-
     // Get all alerts (recent 10)
-    const { data: alerts } = await supabase
+    const { data: alerts, error: alertsError } = await supabase
       .from('alerts')
       .select('id, sender_id, receiver_id, detected_plate, status, created_at')
       .order('created_at', { ascending: false })
       .limit(10)
 
     // Get all users (for reference)
-    const { data: users } = await supabase
+    const { data: users, error: usersError } = await supabase
       .from('users')
-      .select('id, name, email, car_plate')
+      .select('id, name, email, phone, car_plate, push_subscription')
       .limit(20)
 
     return NextResponse.json({
-      userInfo,
       recentAlerts: alerts,
-      allUsers: users?.map(u => ({
+      alertsError: alertsError?.message,
+      users: users?.map(u => ({
         id: u.id,
         name: u.name,
         email: u.email,
-        car_plate: u.car_plate
-      }))
+        phone: u.phone,
+        car_plate: u.car_plate,
+        has_push: !!u.push_subscription
+      })),
+      usersError: usersError?.message
     })
 
   } catch (error: unknown) {
