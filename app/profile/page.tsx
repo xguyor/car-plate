@@ -41,9 +41,30 @@ export default function ProfilePage() {
     }
   }, [])
 
+  // Convert base64 VAPID key to Uint8Array
+  function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4)
+    const base64 = (base64String + padding)
+      .replace(/-/g, '+')
+      .replace(/_/g, '/')
+    const rawData = window.atob(base64)
+    const outputArray = new Uint8Array(rawData.length)
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i)
+    }
+    return outputArray.buffer as ArrayBuffer
+  }
+
   async function enableNotifications(): Promise<PushSubscription | null> {
     if (!('Notification' in window) || !('serviceWorker' in navigator)) {
       setError('Push notifications not supported on this browser')
+      return null
+    }
+
+    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    if (!vapidPublicKey) {
+      setError('Push notifications not configured')
+      console.error('NEXT_PUBLIC_VAPID_PUBLIC_KEY is not set')
       return null
     }
 
@@ -62,7 +83,7 @@ export default function ProfilePage() {
 
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
       })
 
       // Save subscription to localStorage - use toJSON() for proper serialization
