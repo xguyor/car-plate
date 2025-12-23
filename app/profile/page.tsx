@@ -223,10 +223,25 @@ export default function ProfilePage() {
     try {
       let pushSubscription = localStorage.getItem('pushSubscription')
 
+      // If notifications are enabled but we don't have a subscription, try to get one
       if (notificationsEnabled && !pushSubscription) {
         const subscription = await enableNotifications()
         if (subscription) {
           pushSubscription = JSON.stringify(subscription.toJSON())
+        }
+      }
+
+      // Also try to get existing subscription from service worker if we have permission but no stored subscription
+      if (!pushSubscription && 'Notification' in window && Notification.permission === 'granted' && 'serviceWorker' in navigator) {
+        try {
+          const registration = await navigator.serviceWorker.ready
+          const existingSub = await registration.pushManager.getSubscription()
+          if (existingSub) {
+            pushSubscription = JSON.stringify(existingSub.toJSON())
+            localStorage.setItem('pushSubscription', pushSubscription)
+          }
+        } catch (e) {
+          console.error('Failed to get existing subscription:', e)
         }
       }
 
