@@ -493,7 +493,7 @@ export default function CameraPage() {
             <img src="/logo.png" alt="CarBlock" className="w-12 h-12 rounded-xl object-cover scale-125" />
             <div>
               <h1 className="text-lg font-bold">CarBlock</h1>
-              <p className="text-xs text-purple-300">by Guy Or, SW Engineer</p>
+              <p className="text-xs text-purple-300">by Guy Or</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
