@@ -161,7 +161,7 @@ export default function HistoryPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </Link>
-          <img src="/logo.png" alt="CarBlock" className="w-8 h-8 rounded-lg" />
+          <img src="/logo.png" alt="CarBlock" className="w-10 h-10 rounded-lg object-cover scale-125" />
           <h1 className="text-xl font-bold">Alert History</h1>
         </div>
       </div>

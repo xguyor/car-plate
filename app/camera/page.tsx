@@ -269,7 +269,7 @@ export default function CameraPage() {
       <div className="bg-purple-800/50 backdrop-blur-sm text-white p-4 sticky top-0 z-10">
         <div className="flex justify-between items-center max-w-md mx-auto">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="CarBlock" className="w-10 h-10 rounded-xl" />
+            <img src="/logo.png" alt="CarBlock" className="w-12 h-12 rounded-xl object-cover scale-125" />
             <div>
               <h1 className="text-lg font-bold">CarBlock</h1>
               <p className="text-xs text-purple-300">by Forsight Robotics</p>

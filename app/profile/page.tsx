@@ -320,7 +320,7 @@ export default function ProfilePage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </Link>
-            <img src="/logo.png" alt="CarBlock" className="w-8 h-8 rounded-lg" />
+            <img src="/logo.png" alt="CarBlock" className="w-10 h-10 rounded-lg object-cover scale-125" />
             <h1 className="text-xl font-bold">Login</h1>
           </div>
         </div>
@@ -328,7 +328,7 @@ export default function ProfilePage() {
         <div className="p-4 space-y-4 max-w-md mx-auto">
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/30">
             <div className="text-center mb-6">
-              <img src="/logo.png" alt="CarBlock" className="w-20 h-20 mx-auto mb-4 rounded-2xl" />
+              <img src="/logo.png" alt="CarBlock" className="w-24 h-24 mx-auto mb-4 rounded-2xl object-cover scale-110" />
               <h2 className="text-white text-xl font-bold mb-2">Welcome to CarBlock</h2>
               <p className="text-purple-300 text-sm">Enter your phone number to login or register</p>
             </div>
@@ -376,7 +376,7 @@ export default function ProfilePage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <img src="/logo.png" alt="CarBlock" className="w-8 h-8 rounded-lg" />
+            <img src="/logo.png" alt="CarBlock" className="w-10 h-10 rounded-lg object-cover scale-125" />
             <h1 className="text-xl font-bold">Register</h1>
           </div>
         </div>
@@ -428,7 +428,7 @@ export default function ProfilePage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </Link>
-            <img src="/logo.png" alt="CarBlock" className="w-8 h-8 rounded-lg" />
+            <img src="/logo.png" alt="CarBlock" className="w-10 h-10 rounded-lg object-cover scale-125" />
             <h1 className="text-xl font-bold">My Profile</h1>
           </div>
           <button
