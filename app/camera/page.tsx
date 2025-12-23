@@ -327,8 +327,6 @@ export default function CameraPage() {
       // Start camera if not already started
       if (!hasCamera) {
         await startCamera()
-        // Wait a moment for camera to initialize
-        await new Promise(resolve => setTimeout(resolve, 500))
       }
 
       if (!videoRef.current || !canvasRef.current) {
@@ -340,9 +338,17 @@ export default function CameraPage() {
       const video = videoRef.current
       const canvas = canvasRef.current
 
-      // Check if video is ready
+      // Wait for video to be ready with retries
+      let retries = 0
+      const maxRetries = 10
+      while ((video.videoWidth === 0 || video.videoHeight === 0) && retries < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 300))
+        retries++
+      }
+
+      // Check if video is ready after retries
       if (video.videoWidth === 0 || video.videoHeight === 0) {
-        setError('Camera still initializing. Please try again.')
+        setError('Camera failed to initialize. Please try again.')
         setLoading(false)
         return
       }
