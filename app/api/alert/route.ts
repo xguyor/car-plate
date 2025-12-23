@@ -144,7 +144,7 @@ export async function POST(request: Request) {
               </p>
 
               <p style="color: #9333ea; font-size: 12px; margin-top: 30px;">
-                Sent via CarBlock by Forsight Robotics
+                Sent via CarBlock by Guy Or, SW Engineer
               </p>
             </div>
           `
