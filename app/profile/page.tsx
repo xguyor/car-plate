@@ -222,6 +222,9 @@ export default function ProfilePage() {
 
     try {
       let pushSubscription = localStorage.getItem('pushSubscription')
+      console.log('saveProfile - initial pushSubscription from localStorage:', pushSubscription ? 'exists' : 'null')
+      console.log('saveProfile - notificationsEnabled state:', notificationsEnabled)
+      console.log('saveProfile - Notification.permission:', typeof Notification !== 'undefined' ? Notification.permission : 'N/A')
 
       // If notifications are enabled but we don't have a subscription, try to get one
       if (notificationsEnabled && !pushSubscription) {
@@ -231,11 +234,12 @@ export default function ProfilePage() {
         }
       }
 
-      // Also try to get existing subscription from service worker if we have permission but no stored subscription
-      if (!pushSubscription && 'Notification' in window && Notification.permission === 'granted' && 'serviceWorker' in navigator) {
+      // Always try to get subscription from service worker if we have permission - this ensures we get the actual active subscription
+      if ('Notification' in window && Notification.permission === 'granted' && 'serviceWorker' in navigator) {
         try {
           const registration = await navigator.serviceWorker.ready
           const existingSub = await registration.pushManager.getSubscription()
+          console.log('saveProfile - service worker subscription:', existingSub ? 'exists' : 'null')
           if (existingSub) {
             pushSubscription = JSON.stringify(existingSub.toJSON())
             localStorage.setItem('pushSubscription', pushSubscription)
@@ -246,6 +250,7 @@ export default function ProfilePage() {
       }
 
       const parsedSubscription = pushSubscription ? JSON.parse(pushSubscription) : null
+      console.log('saveProfile - final parsedSubscription:', parsedSubscription ? 'exists with endpoint ' + parsedSubscription.endpoint?.substring(0, 50) : 'null')
       const existingUserId = localStorage.getItem('userId')
 
       const response = await fetch('/api/profile', {
