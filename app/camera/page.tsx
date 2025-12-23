@@ -44,6 +44,97 @@ export default function CameraPage() {
   const [alertsLoading, setAlertsLoading] = useState(false)
   const [updatingAlertId, setUpdatingAlertId] = useState<string | null>(null)
 
+  // Push notification prompt state
+  const [showPushPrompt, setShowPushPrompt] = useState(false)
+  const [enablingPush, setEnablingPush] = useState(false)
+
+  function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4)
+    const base64 = (base64String + padding)
+      .replace(/-/g, '+')
+      .replace(/_/g, '/')
+    const rawData = window.atob(base64)
+    const outputArray = new Uint8Array(rawData.length)
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i)
+    }
+    return outputArray.buffer as ArrayBuffer
+  }
+
+  async function enablePushNotifications() {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      setShowPushPrompt(false)
+      localStorage.setItem('pushPromptShown', 'true')
+      return
+    }
+
+    setEnablingPush(true)
+    try {
+      const vapidResponse = await fetch('/api/vapid-key', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      })
+
+      if (!vapidResponse.ok) {
+        throw new Error('Failed to get VAPID key')
+      }
+
+      const vapidData = await vapidResponse.json()
+      const vapidPublicKey = vapidData.vapidPublicKey?.trim()
+
+      if (!vapidPublicKey) {
+        throw new Error('VAPID key missing')
+      }
+
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') {
+        setShowPushPrompt(false)
+        localStorage.setItem('pushPromptShown', 'true')
+        return
+      }
+
+      const registration = await navigator.serviceWorker.register('/sw.js')
+      await navigator.serviceWorker.ready
+
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+      })
+
+      const subscriptionJson = subscription.toJSON()
+      localStorage.setItem('pushSubscription', JSON.stringify(subscriptionJson))
+
+      // If user is registered, update their push subscription
+      const userId = localStorage.getItem('userId')
+      if (userId) {
+        await fetch('/api/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: localStorage.getItem('userName'),
+            email: localStorage.getItem('userEmail'),
+            phone: localStorage.getItem('userPhone'),
+            carPlate: localStorage.getItem('userPlate'),
+            pushSubscription: subscriptionJson,
+            existingUserId: userId
+          })
+        })
+      }
+
+      setShowPushPrompt(false)
+      localStorage.setItem('pushPromptShown', 'true')
+    } catch (err) {
+      console.error('Push notification error:', err)
+    } finally {
+      setEnablingPush(false)
+    }
+  }
+
+  function dismissPushPrompt() {
+    setShowPushPrompt(false)
+    localStorage.setItem('pushPromptShown', 'true')
+  }
+
   function formatPlate(value: string) {
     const digits = value.replace(/\D/g, '')
     if (digits.length <= 7) {
@@ -122,6 +213,13 @@ export default function CameraPage() {
       // Load active alerts if registered
       if (userEmail && userId) {
         loadActiveAlerts()
+      }
+
+      // Check if we should show push notification prompt
+      const pushPromptShown = localStorage.getItem('pushPromptShown')
+      if (!pushPromptShown && 'Notification' in window && Notification.permission === 'default') {
+        // Show prompt after a short delay to not overwhelm user
+        setTimeout(() => setShowPushPrompt(true), 1000)
       }
     } catch (err) {
       console.error('Error checking registration:', err)
@@ -265,6 +363,50 @@ export default function CameraPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-900 to-purple-950">
+      {/* Push Notification Prompt Modal */}
+      {showPushPrompt && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gradient-to-b from-purple-800 to-purple-900 rounded-2xl p-6 max-w-sm w-full border border-purple-500/30 shadow-2xl">
+            <div className="text-center mb-4">
+              <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-white mb-2">Enable Notifications</h2>
+              <p className="text-purple-300 text-sm">
+                Get instant alerts when someone blocks your car or when a blocked car owner needs to leave.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={enablePushNotifications}
+                disabled={enablingPush}
+                className="w-full bg-purple-500 hover:bg-purple-400 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {enablingPush ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Enable Notifications
+                  </>
+                )}
+              </button>
+              <button
+                onClick={dismissPushPrompt}
+                className="w-full bg-purple-800/50 hover:bg-purple-700/50 text-purple-300 py-3 px-4 rounded-xl font-medium"
+              >
+                Maybe Later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-purple-800/50 backdrop-blur-sm text-white p-4 sticky top-0 z-10">
         <div className="flex justify-between items-center max-w-md mx-auto">
