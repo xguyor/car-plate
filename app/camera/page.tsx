@@ -12,7 +12,7 @@ interface OwnerInfo {
 interface ActiveAlert {
   id: string
   detected_plate: string
-  status: 'active' | 'leaving_soon' | 'resolved'
+  status: 'active' | 'leaving_soon' | 'leaving_now' | 'resolved'
   type: 'sent' | 'received'
   sender_name?: string
   sender_phone?: string
@@ -172,7 +172,7 @@ export default function CameraPage() {
   }, [])
 
   // Update alert status
-  async function updateAlertStatus(alertId: string, status: 'leaving_soon' | 'resolved') {
+  async function updateAlertStatus(alertId: string, status: 'leaving_soon' | 'leaving_now' | 'resolved') {
     setUpdatingAlertId(alertId)
     try {
       const userId = localStorage.getItem('userId')
@@ -475,27 +475,69 @@ export default function CameraPage() {
               </div>
 
               {alert.status === 'active' && (
-                <button
-                  onClick={() => updateAlertStatus(alert.id, 'leaving_soon')}
-                  disabled={updatingAlertId === alert.id}
-                  className="w-full bg-orange-500 hover:bg-orange-400 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {updatingAlertId === alert.id ? (
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      I Need to Leave Soon
-                    </>
-                  )}
-                </button>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => updateAlertStatus(alert.id, 'leaving_soon')}
+                    disabled={updatingAlertId === alert.id}
+                    className="w-full bg-orange-500 hover:bg-orange-400 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {updatingAlertId === alert.id ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        I Need to Leave Soon (~15 min)
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => updateAlertStatus(alert.id, 'leaving_now')}
+                    disabled={updatingAlertId === alert.id}
+                    className="w-full bg-red-600 hover:bg-red-500 text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {updatingAlertId === alert.id ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        I Need to Leave NOW!!
+                      </>
+                    )}
+                  </button>
+                </div>
               )}
 
               {alert.status === 'leaving_soon' && (
-                <div className="bg-orange-500/20 text-orange-300 py-3 px-4 rounded-xl text-center font-medium mb-3">
-                  Waiting for blocker to move...
+                <div className="space-y-2">
+                  <div className="bg-orange-500/20 text-orange-300 py-3 px-4 rounded-xl text-center font-medium">
+                    Notified: Leaving in ~15 min
+                  </div>
+                  <button
+                    onClick={() => updateAlertStatus(alert.id, 'leaving_now')}
+                    disabled={updatingAlertId === alert.id}
+                    className="w-full bg-red-600 hover:bg-red-500 text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {updatingAlertId === alert.id ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        Upgrade: I Need to Leave NOW!!
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {alert.status === 'leaving_now' && (
+                <div className="bg-red-500/30 text-red-300 py-3 px-4 rounded-xl text-center font-bold animate-pulse">
+                  URGENT sent! Waiting for blocker...
                 </div>
               )}
 
@@ -524,38 +566,67 @@ export default function CameraPage() {
             <div
               key={alert.id}
               className={`rounded-2xl p-4 ${
-                alert.status === 'leaving_soon'
-                  ? 'bg-gradient-to-r from-red-600/40 to-red-500/40 border-2 border-red-500 animate-pulse'
+                alert.status === 'leaving_now'
+                  ? 'bg-gradient-to-r from-red-700/50 to-red-600/50 border-2 border-red-400 animate-pulse'
+                  : alert.status === 'leaving_soon'
+                  ? 'bg-gradient-to-r from-orange-600/30 to-orange-500/30 border-2 border-orange-500'
                   : 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border border-yellow-500/40'
               }`}
             >
-              {/* URGENT banner for leaving_soon */}
-              {alert.status === 'leaving_soon' && (
-                <div className="bg-red-600 text-white py-3 px-4 rounded-xl text-center mb-4 -mt-1 -mx-1">
+              {/* URGENT NOW banner */}
+              {alert.status === 'leaving_now' && (
+                <div className="bg-red-600 text-white py-4 px-4 rounded-xl text-center mb-4 -mt-1 -mx-1 animate-pulse">
                   <div className="flex items-center justify-center gap-2">
-                    <svg className="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-8 h-8 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
-                    <span className="font-bold text-lg">MOVE YOUR CAR NOW!</span>
-                    <svg className="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <span className="font-bold text-xl">MOVE YOUR CAR NOW!!!</span>
+                    <svg className="w-8 h-8 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                   </div>
-                  <p className="text-red-100 text-sm mt-1">The car owner needs to leave urgently</p>
+                  <p className="text-red-100 text-sm mt-2 font-medium">The car owner needs to leave IMMEDIATELY!</p>
+                </div>
+              )}
+
+              {/* Soon banner */}
+              {alert.status === 'leaving_soon' && (
+                <div className="bg-orange-500 text-white py-3 px-4 rounded-xl text-center mb-4 -mt-1 -mx-1">
+                  <div className="flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="font-bold">Owner leaving in ~15 minutes</span>
+                  </div>
+                  <p className="text-orange-100 text-sm mt-1">Please move your car soon</p>
                 </div>
               )}
 
               <div className="flex items-center gap-2 mb-2">
-                <div className={`w-3 h-3 rounded-full ${alert.status === 'leaving_soon' ? 'bg-red-500 animate-ping' : 'bg-yellow-400'}`}></div>
-                <span className={`font-medium ${alert.status === 'leaving_soon' ? 'text-red-300' : 'text-yellow-300'}`}>
-                  {alert.status === 'leaving_soon' ? 'URGENT: Owner wants to leave!' : 'You are blocking a car'}
+                <div className={`w-3 h-3 rounded-full ${
+                  alert.status === 'leaving_now' ? 'bg-red-500 animate-ping'
+                  : alert.status === 'leaving_soon' ? 'bg-orange-400 animate-pulse'
+                  : 'bg-yellow-400'
+                }`}></div>
+                <span className={`font-medium ${
+                  alert.status === 'leaving_now' ? 'text-red-300 font-bold'
+                  : alert.status === 'leaving_soon' ? 'text-orange-300'
+                  : 'text-yellow-300'
+                }`}>
+                  {alert.status === 'leaving_now' ? 'URGENT: Owner needs to leave NOW!'
+                   : alert.status === 'leaving_soon' ? 'Owner leaving soon (~15 min)'
+                   : 'You are blocking a car'}
                 </span>
               </div>
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <p className="text-white text-sm">Owner: <span className="font-medium">{alert.receiver_name || 'Unknown'}</span></p>
                   {alert.receiver_phone && (
-                    <a href={`tel:${alert.receiver_phone}`} className={`text-sm flex items-center gap-1 mt-1 ${alert.status === 'leaving_soon' ? 'text-red-300 font-bold' : 'text-purple-300'}`}>
+                    <a href={`tel:${alert.receiver_phone}`} className={`text-sm flex items-center gap-1 mt-1 ${
+                      alert.status === 'leaving_now' ? 'text-red-300 font-bold'
+                      : alert.status === 'leaving_soon' ? 'text-orange-300'
+                      : 'text-purple-300'
+                    }`}>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                       </svg>
@@ -573,8 +644,10 @@ export default function CameraPage() {
                 onClick={() => updateAlertStatus(alert.id, 'resolved')}
                 disabled={updatingAlertId === alert.id}
                 className={`w-full text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-50 ${
-                  alert.status === 'leaving_soon'
-                    ? 'bg-green-600 hover:bg-green-500 text-lg'
+                  alert.status === 'leaving_now'
+                    ? 'bg-green-600 hover:bg-green-500 text-lg font-bold'
+                    : alert.status === 'leaving_soon'
+                    ? 'bg-green-600 hover:bg-green-500'
                     : 'bg-green-500 hover:bg-green-400'
                 }`}
               >
@@ -656,7 +729,7 @@ export default function CameraPage() {
               setManualEdit(true)
               setOwnerInfo(null)
             }}
-            placeholder="1234567"
+            placeholder="xx-xxx-xx or xxx-xx-xxx"
             className="w-full px-4 py-4 bg-purple-900/50 border border-purple-500/30 rounded-xl text-white text-center text-2xl font-mono placeholder-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-400"
           />
         </div>

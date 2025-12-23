@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    if (!['leaving_soon', 'resolved'].includes(status)) {
+    if (!['leaving_soon', 'leaving_now', 'resolved'].includes(status)) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
     }
 
@@ -56,8 +56,8 @@ export async function POST(request: Request) {
     const sender = alert.sender as { id: string; name?: string; phone?: string; email?: string; push_subscription?: object } | null
     const receiver = alert.receiver as { id: string; name?: string; phone?: string; email?: string; push_subscription?: object } | null
 
-    if (status === 'leaving_soon') {
-      // Only the blocked person (receiver) can send "leaving soon"
+    if (status === 'leaving_soon' || status === 'leaving_now') {
+      // Only the blocked person (receiver) can send "leaving soon" or "leaving now"
       if (receiver?.id !== userId) {
         return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
       }
@@ -84,10 +84,11 @@ export async function POST(request: Request) {
     }
 
     // Send notification to the other party
-    if (status === 'leaving_soon' && sender) {
+    if ((status === 'leaving_soon' || status === 'leaving_now') && sender) {
       // Notify the blocker that the blocked person wants to leave
       const blockedPersonName = receiver?.name || 'The car owner'
       const blockedPersonPhone = receiver?.phone || ''
+      const isUrgent = status === 'leaving_now'
 
       // Send push notification
       if (sender.push_subscription && webPushConfigured) {
@@ -95,8 +96,10 @@ export async function POST(request: Request) {
           await webpush.sendNotification(
             sender.push_subscription as webpush.PushSubscription,
             JSON.stringify({
-              title: 'Time to move your car!',
-              body: `${blockedPersonName} needs to leave. Please move your car.`,
+              title: isUrgent ? 'URGENT: Move your car NOW!' : 'Time to move your car (~15 min)',
+              body: isUrgent
+                ? `${blockedPersonName} needs to leave IMMEDIATELY! Please move your car now.`
+                : `${blockedPersonName} needs to leave in about 15 minutes. Please move your car soon.`,
               icon: '/icon-192.png',
               badge: '/icon-192.png',
               data: { url: '/history' }
@@ -113,10 +116,10 @@ export async function POST(request: Request) {
           await resend.emails.send({
             from: 'CarBlock Alert <onboarding@resend.dev>',
             to: sender.email,
-            subject: 'Time to move your car!',
+            subject: isUrgent ? 'URGENT: Move your car NOW!' : 'Time to move your car (~15 min)',
             html: `
-              <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #581c87, #86198f); padding: 30px; border-radius: 16px;">
-                <h1 style="color: white; margin: 0 0 20px 0; font-size: 24px;">Time to Move Your Car!</h1>
+              <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, ${isUrgent ? '#dc2626, #b91c1c' : '#581c87, #86198f'}); padding: 30px; border-radius: 16px;">
+                <h1 style="color: white; margin: 0 0 20px 0; font-size: 24px;">${isUrgent ? 'URGENT: Move Your Car NOW!' : 'Time to Move Your Car (~15 min)'}</h1>
 
                 <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 12px; margin-bottom: 20px;">
                   <p style="color: #e9d5ff; margin: 0 0 10px 0; font-size: 14px;">Car you're blocking</p>
@@ -129,8 +132,8 @@ export async function POST(request: Request) {
                   ${blockedPersonPhone ? `<a href="tel:${blockedPersonPhone}" style="color: #a855f7; text-decoration: none; font-size: 16px;">Call: ${blockedPersonPhone}</a>` : ''}
                 </div>
 
-                <p style="color: #fbbf24; font-size: 16px; margin-top: 20px; font-weight: bold;">
-                  Please move your car as soon as possible!
+                <p style="color: ${isUrgent ? '#fef08a' : '#fbbf24'}; font-size: ${isUrgent ? '20px' : '16px'}; margin-top: 20px; font-weight: bold;">
+                  ${isUrgent ? 'PLEASE MOVE YOUR CAR IMMEDIATELY!' : 'Please move your car within the next 15 minutes.'}
                 </p>
 
                 <p style="color: #9333ea; font-size: 12px; margin-top: 30px;">

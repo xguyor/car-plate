@@ -7,7 +7,7 @@ interface Alert {
   id: string
   detected_plate: string
   created_at: string
-  status: 'active' | 'leaving_soon' | 'resolved'
+  status: 'active' | 'leaving_soon' | 'leaving_now' | 'resolved'
   sender_name?: string
   sender_phone?: string
   receiver_name?: string
@@ -67,7 +67,7 @@ export default function HistoryPage() {
     }
   }
 
-  async function updateAlertStatus(alertId: string, status: 'leaving_soon' | 'resolved') {
+  async function updateAlertStatus(alertId: string, status: 'leaving_soon' | 'leaving_now' | 'resolved') {
     setUpdatingId(alertId)
     try {
       const userId = localStorage.getItem('userId')
@@ -123,12 +123,22 @@ export default function HistoryPage() {
         )
       case 'leaving_soon':
         return isSentTab ? (
-          <span className="px-2 py-1 bg-red-500/30 text-red-300 text-xs rounded-full font-bold animate-pulse">
-            URGENT!
+          <span className="px-2 py-1 bg-orange-500/30 text-orange-300 text-xs rounded-full font-bold">
+            ~15 min
           </span>
         ) : (
           <span className="px-2 py-1 bg-orange-500/20 text-orange-300 text-xs rounded-full">
-            Wants to leave
+            Leaving soon
+          </span>
+        )
+      case 'leaving_now':
+        return isSentTab ? (
+          <span className="px-2 py-1 bg-red-500/30 text-red-300 text-xs rounded-full font-bold animate-pulse">
+            URGENT!!
+          </span>
+        ) : (
+          <span className="px-2 py-1 bg-red-500/20 text-red-300 text-xs rounded-full">
+            Leaving NOW
           </span>
         )
       case 'resolved':
@@ -148,6 +158,8 @@ export default function HistoryPage() {
         return 'bg-yellow-400'
       case 'leaving_soon':
         return 'bg-orange-400'
+      case 'leaving_now':
+        return 'bg-red-500'
       case 'resolved':
         return 'bg-green-400'
       default:
@@ -257,21 +269,34 @@ export default function HistoryPage() {
                 className={`backdrop-blur-sm rounded-xl p-4 border ${
                   alert.status === 'resolved'
                     ? 'bg-white/10 border-green-500/30'
+                    : alert.status === 'leaving_now' && activeTab === 'sent'
+                    ? 'bg-red-500/30 border-2 border-red-400 animate-pulse'
                     : alert.status === 'leaving_soon' && activeTab === 'sent'
-                    ? 'bg-red-500/20 border-2 border-red-500 animate-pulse'
-                    : alert.status === 'leaving_soon'
+                    ? 'bg-orange-500/20 border-2 border-orange-500'
+                    : alert.status === 'leaving_now' || alert.status === 'leaving_soon'
                     ? 'bg-white/10 border-orange-500/30'
                     : 'bg-white/10 border-purple-500/30'
                 }`}
               >
-                {/* URGENT banner for sent alerts when owner wants to leave */}
-                {activeTab === 'sent' && alert.status === 'leaving_soon' && (
-                  <div className="bg-red-600 text-white py-2 px-3 rounded-lg text-center mb-3 -mt-1 -mx-1">
+                {/* URGENT NOW banner */}
+                {activeTab === 'sent' && alert.status === 'leaving_now' && (
+                  <div className="bg-red-600 text-white py-3 px-3 rounded-lg text-center mb-3 -mt-1 -mx-1 animate-pulse">
                     <div className="flex items-center justify-center gap-2">
-                      <svg className="w-5 h-5 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
-                      <span className="font-bold">MOVE YOUR CAR NOW!</span>
+                      <span className="font-bold text-lg">MOVE YOUR CAR NOW!!!</span>
+                    </div>
+                  </div>
+                )}
+                {/* Soon banner */}
+                {activeTab === 'sent' && alert.status === 'leaving_soon' && (
+                  <div className="bg-orange-500 text-white py-2 px-3 rounded-lg text-center mb-3 -mt-1 -mx-1">
+                    <div className="flex items-center justify-center gap-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="font-bold">Leaving in ~15 minutes</span>
                     </div>
                   </div>
                 )}
@@ -326,27 +351,69 @@ export default function HistoryPage() {
                 {alert.status !== 'resolved' && (
                   <div className="mt-3 pt-3 border-t border-purple-500/20">
                     {activeTab === 'received' && alert.status === 'active' && (
-                      <button
-                        onClick={() => updateAlertStatus(alert.id, 'leaving_soon')}
-                        disabled={updatingId === alert.id}
-                        className="w-full bg-orange-500 hover:bg-orange-400 text-white py-2 px-4 rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50"
-                      >
-                        {updatingId === alert.id ? (
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        ) : (
-                          <>
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            I Need to Leave Soon
-                          </>
-                        )}
-                      </button>
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => updateAlertStatus(alert.id, 'leaving_soon')}
+                          disabled={updatingId === alert.id}
+                          className="w-full bg-orange-500 hover:bg-orange-400 text-white py-2 px-4 rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          {updatingId === alert.id ? (
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <>
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              Leaving Soon (~15 min)
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => updateAlertStatus(alert.id, 'leaving_now')}
+                          disabled={updatingId === alert.id}
+                          className="w-full bg-red-600 hover:bg-red-500 text-white py-2 px-4 rounded-lg font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          {updatingId === alert.id ? (
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <>
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                              </svg>
+                              Need to Leave NOW!!
+                            </>
+                          )}
+                        </button>
+                      </div>
                     )}
 
                     {activeTab === 'received' && alert.status === 'leaving_soon' && (
-                      <div className="text-center text-orange-300 text-sm mb-2">
-                        Waiting for the blocker to move...
+                      <div className="space-y-2">
+                        <div className="text-center text-orange-300 text-sm">
+                          Notified: Leaving in ~15 min
+                        </div>
+                        <button
+                          onClick={() => updateAlertStatus(alert.id, 'leaving_now')}
+                          disabled={updatingId === alert.id}
+                          className="w-full bg-red-600 hover:bg-red-500 text-white py-2 px-4 rounded-lg font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          {updatingId === alert.id ? (
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <>
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                              </svg>
+                              Upgrade: Need to Leave NOW!!
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+
+                    {activeTab === 'received' && alert.status === 'leaving_now' && (
+                      <div className="text-center text-red-300 text-sm font-bold animate-pulse">
+                        URGENT sent! Waiting for blocker...
                       </div>
                     )}
 
