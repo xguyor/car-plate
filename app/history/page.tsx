@@ -113,7 +113,7 @@ export default function HistoryPage() {
     return date.toLocaleDateString()
   }
 
-  function getStatusBadge(status: string) {
+  function getStatusBadge(status: string, isSentTab: boolean = false) {
     switch (status) {
       case 'active':
         return (
@@ -122,7 +122,11 @@ export default function HistoryPage() {
           </span>
         )
       case 'leaving_soon':
-        return (
+        return isSentTab ? (
+          <span className="px-2 py-1 bg-red-500/30 text-red-300 text-xs rounded-full font-bold animate-pulse">
+            URGENT!
+          </span>
+        ) : (
           <span className="px-2 py-1 bg-orange-500/20 text-orange-300 text-xs rounded-full">
             Wants to leave
           </span>
@@ -250,21 +254,34 @@ export default function HistoryPage() {
             {filteredAlerts.map((alert) => (
               <div
                 key={alert.id}
-                className={`bg-white/10 backdrop-blur-sm rounded-xl p-4 border ${
+                className={`backdrop-blur-sm rounded-xl p-4 border ${
                   alert.status === 'resolved'
-                    ? 'border-green-500/30'
+                    ? 'bg-white/10 border-green-500/30'
+                    : alert.status === 'leaving_soon' && activeTab === 'sent'
+                    ? 'bg-red-500/20 border-2 border-red-500 animate-pulse'
                     : alert.status === 'leaving_soon'
-                    ? 'border-orange-500/30'
-                    : 'border-purple-500/30'
+                    ? 'bg-white/10 border-orange-500/30'
+                    : 'bg-white/10 border-purple-500/30'
                 }`}
               >
+                {/* URGENT banner for sent alerts when owner wants to leave */}
+                {activeTab === 'sent' && alert.status === 'leaving_soon' && (
+                  <div className="bg-red-600 text-white py-2 px-3 rounded-lg text-center mb-3 -mt-1 -mx-1">
+                    <div className="flex items-center justify-center gap-2">
+                      <svg className="w-5 h-5 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <span className="font-bold">MOVE YOUR CAR NOW!</span>
+                    </div>
+                  </div>
+                )}
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${getStatusColor(alert.status)}`}></div>
                     <span className="text-white font-mono text-lg">{alert.detected_plate}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    {getStatusBadge(alert.status)}
+                    {getStatusBadge(alert.status, activeTab === 'sent')}
                     <span className="text-xs text-purple-400">{formatDate(alert.created_at)}</span>
                   </div>
                 </div>
