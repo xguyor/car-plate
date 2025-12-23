@@ -67,7 +67,12 @@ export async function POST(request: Request) {
     // Fallback: extract any numbers
     if (!bestMatch) {
       const numbers = text.replace(/[^0-9]/g, '')
-      if (numbers.length >= 7) {
+      if (numbers.length >= 8) {
+        // 8-digit plate: XXX-XX-XXX
+        bestMatch = `${numbers.slice(0,3)}-${numbers.slice(3,5)}-${numbers.slice(5,8)}`
+        bestConfidence = 0.4
+      } else if (numbers.length >= 7) {
+        // 7-digit plate: XX-XXX-XX
         bestMatch = `${numbers.slice(0,2)}-${numbers.slice(2,5)}-${numbers.slice(5,7)}`
         bestConfidence = 0.4
       } else {
