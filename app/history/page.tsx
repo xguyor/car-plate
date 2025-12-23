@@ -26,6 +26,48 @@ export default function HistoryPage() {
 
   useEffect(() => {
     loadAlerts()
+
+    // Auto-refresh when app becomes visible (user returns to app)
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        loadAlerts()
+      }
+    }
+
+    // Auto-refresh on focus (for desktop browsers)
+    function handleFocus() {
+      loadAlerts()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+
+    // Listen for service worker messages (push notification received)
+    function handleServiceWorkerMessage(event: MessageEvent) {
+      if (event.data?.type === 'ALERT_UPDATE') {
+        loadAlerts()
+      }
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage)
+    }
+
+    // Periodic polling every 10 seconds
+    const pollInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        loadAlerts()
+      }
+    }, 10000)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage)
+      }
+      clearInterval(pollInterval)
+    }
   }, [])
 
   async function loadAlerts() {

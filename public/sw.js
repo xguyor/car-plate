@@ -16,7 +16,15 @@ self.addEventListener('push', function(event) {
     }
 
     event.waitUntil(
-      self.registration.showNotification(data.title, options)
+      Promise.all([
+        self.registration.showNotification(data.title, options),
+        // Notify all open clients to refresh their data
+        clients.matchAll({ type: 'window' }).then(function(clientList) {
+          clientList.forEach(function(client) {
+            client.postMessage({ type: 'ALERT_UPDATE', data: data })
+          })
+        })
+      ])
     )
   }
 })

@@ -225,7 +225,62 @@ export default function CameraPage() {
       console.error('Error checking registration:', err)
     }
 
-    return () => stopCamera()
+    // Auto-refresh when app becomes visible (user returns to app)
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        const userId = localStorage.getItem('userId')
+        const userEmail = localStorage.getItem('userEmail')
+        if (userId && userEmail) {
+          loadActiveAlerts()
+        }
+      }
+    }
+
+    // Auto-refresh on focus (for desktop browsers)
+    function handleFocus() {
+      const userId = localStorage.getItem('userId')
+      const userEmail = localStorage.getItem('userEmail')
+      if (userId && userEmail) {
+        loadActiveAlerts()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+
+    // Listen for service worker messages (push notification received)
+    function handleServiceWorkerMessage(event: MessageEvent) {
+      if (event.data?.type === 'ALERT_UPDATE') {
+        const userId = localStorage.getItem('userId')
+        const userEmail = localStorage.getItem('userEmail')
+        if (userId && userEmail) {
+          loadActiveAlerts()
+        }
+      }
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage)
+    }
+
+    // Periodic polling every 10 seconds for active alerts
+    const pollInterval = setInterval(() => {
+      const userId = localStorage.getItem('userId')
+      const userEmail = localStorage.getItem('userEmail')
+      if (userId && userEmail && document.visibilityState === 'visible') {
+        loadActiveAlerts()
+      }
+    }, 10000)
+
+    return () => {
+      stopCamera()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage)
+      }
+      clearInterval(pollInterval)
+    }
   }, [loadActiveAlerts])
 
   async function startCamera() {
