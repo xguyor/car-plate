@@ -201,7 +201,7 @@ export default function CameraPage() {
     // Ensure we're in the browser
     if (typeof window === 'undefined') return
 
-    startCamera()
+    // Don't start camera automatically - wait for user to click scan
     // Check if user is registered and get their name
     try {
       const userEmail = localStorage.getItem('userEmail')
@@ -319,16 +319,35 @@ export default function CameraPage() {
   }
 
   async function captureAndDetect() {
-    if (!videoRef.current || !canvasRef.current) return
-
     setLoading(true)
     setError('')
     setPlate('')
     setOwnerInfo(null)
 
     try {
+      // Start camera if not already started
+      if (!hasCamera) {
+        await startCamera()
+        // Wait a moment for camera to initialize
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+
+      if (!videoRef.current || !canvasRef.current) {
+        setError('Camera not available')
+        setLoading(false)
+        return
+      }
+
       const video = videoRef.current
       const canvas = canvasRef.current
+
+      // Check if video is ready
+      if (video.videoWidth === 0 || video.videoHeight === 0) {
+        setError('Camera still initializing. Please try again.')
+        setLoading(false)
+        return
+      }
+
       canvas.width = video.videoWidth
       canvas.height = video.videoHeight
 
@@ -756,14 +775,14 @@ export default function CameraPage() {
           <canvas ref={canvasRef} className="hidden" />
 
           {!hasCamera && (
-            <div className="absolute inset-0 flex items-center justify-center bg-purple-900/80 text-white text-center p-6">
+            <div className="absolute inset-0 flex items-center justify-center bg-purple-900/90 text-white text-center p-6">
               <div>
                 <svg className="w-16 h-16 mx-auto mb-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                <p className="text-purple-200">Camera not available</p>
-                <p className="text-sm text-purple-400 mt-1">Enter plate manually below</p>
+                <p className="text-purple-200 font-medium">Tap &quot;Scan Plate&quot; to start camera</p>
+                <p className="text-sm text-purple-400 mt-1">Or enter plate manually below</p>
               </div>
             </div>
           )}
