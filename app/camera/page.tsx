@@ -104,21 +104,20 @@ export default function CameraPage() {
       const subscriptionJson = subscription.toJSON()
       localStorage.setItem('pushSubscription', JSON.stringify(subscriptionJson))
 
-      // If user is registered, update their push subscription
+      // Save push subscription to database immediately if user is registered
       const userId = localStorage.getItem('userId')
       if (userId) {
-        await fetch('/api/profile', {
+        await fetch('/api/push-subscription', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name: localStorage.getItem('userName'),
-            email: localStorage.getItem('userEmail'),
-            phone: localStorage.getItem('userPhone'),
-            carPlate: localStorage.getItem('userPlate'),
-            pushSubscription: subscriptionJson,
-            existingUserId: userId
+            visitorId: userId,
+            pushSubscription: subscriptionJson
           })
         })
+        console.log('Push subscription saved to database for user:', userId)
+      } else {
+        console.log('Push subscription saved to localStorage (user not registered yet)')
       }
 
       setShowPushPrompt(false)

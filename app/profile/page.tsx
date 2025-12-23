@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 type ViewMode = 'login' | 'register' | 'edit'
 
 export default function ProfilePage() {
+  const router = useRouter()
   const [viewMode, setViewMode] = useState<ViewMode>('login')
   const [loginPhone, setLoginPhone] = useState('')
   const [name, setName] = useState('')
@@ -283,8 +285,8 @@ export default function ProfilePage() {
         localStorage.setItem('userId', data.userId)
       }
 
-      setSuccess('Profile saved!')
-      setViewMode('edit')
+      // Redirect to main page after successful save
+      router.push('/camera')
     } catch (err) {
       console.error('Save error:', err)
       setError(err instanceof Error ? err.message : 'Failed to save. Please try again.')
